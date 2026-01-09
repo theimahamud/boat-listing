@@ -1,0 +1,962 @@
+/**
+ * All of the CSS for your public-facing functionality should be
+ * included in this file.
+ */
+ul{
+    padding: 0px;
+}
+ .site-header {
+    z-index: 1 !important;
+    position: relative;
+}
+
+p.no-boat-message {
+    text-align: center;
+    padding: 30px;
+    font-size: 20px;
+}
+.boat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.yacht-card {
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    max-width: 360px;
+    margin: 20px auto;
+    transition: transform 0.3s ease;
+}
+.yacht-card:hover {
+    transform: translateY(-6px);
+}
+.yacht-image {
+    width: 100%;
+    height: 220px !important;
+    object-fit: cover;
+}
+.yacht-details {
+    padding: 20px 20px;
+    text-align: center;
+}
+.yacht-title {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #0d3c61;
+}
+.yacht-location {
+    font-size: 14px;
+    color: #009ca6;
+    margin-bottom: 10px;
+}
+.yacht-price {
+    font-weight: bold;
+    font-size: 16px;
+    color: #d35400;
+    margin-bottom: 20px;
+}
+.yacht-specs {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 auto 15px;
+    max-width: 280px;
+    box-shadow: 0px 0px 30px 0px #8080804a;
+    padding: 10px;
+    border-radius: 6px;
+}
+.spec-box {
+    text-align: center;
+}
+.spec-box span {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    color: #000000;
+    line-height: 18px;
+}
+.spec-box small {
+    font-size: 12px;
+    color: #7f8c8d;
+    line-height: 12px;
+}
+.yacht-meta {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 10px;
+}
+.yacht-meta p{
+    margin: 0px !important;
+}
+.air-tag {
+    font-size: 13px;
+    color: #3498db;
+    margin-bottom: 15px;
+}
+.yacht-button {
+    display: inline-block;
+    background-color: #27ae60;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+    border: 1px solid #27ae60;
+    text-decoration: none !important;
+    width: 100%;
+}
+.yacht-button:hover {
+    background-color: #1e874b00;
+    color: #27ae60 !important;
+}
+
+
+.boat-pagination {
+    margin-top: 30px;
+    text-align: center;
+}
+.boat-pagination a {
+    margin: 0 5px;
+    padding: 8px 12px;
+    background: #eee;
+    border-radius: 5px;
+    text-decoration: none;
+    color: #333;
+}
+.boat-pagination a.active {
+    background: #333;
+    color: #fff;
+}
+
+.nausys-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255,255,255,0.7);
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.nausys-loading-overlay img {
+  width: 180px; /* or your preferred size */
+  height: auto;
+  border-radius: 50% !important;
+  position: absolute;
+  top: 60px;
+}
+
+/* Boat details page  */
+
+.single-boat-details{
+    display: flex;
+    gap: 40px;
+}
+
+.single-boat-details .single-boat-img{
+    width: 50%;
+}
+.single-boat-img img{
+    width: 100% !important;
+}
+
+.bl-slick-slider .slick-slide{
+    height: 400px;
+    width: 100%;
+    background: #000 !important;
+}
+
+.bl-slick-slider-nav{
+    margin-top: 0px !important;
+}
+.bl-slick-slider-nav .slick-slide{
+    width: 100px !important;
+    height: 80px;
+    margin: 10px;
+    background: #000 !important;
+
+}
+
+.bl-slick-slider-nav .slick-slide img{
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.bl-slick-slider-nav .slick-prev,
+.bl-slick-slider-nav .slick-next {
+    font-size: 0 !important;
+    z-index: 9;
+    height: 80px;
+    background: #38bfef !important;
+    border: 1px solid #38bfef !important;
+    color: #fff !important;
+    width: 40px !important;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+ 
+}
+.bl-slick-slider-nav .slick-prev{
+    left: 0px !important;
+    border-radius: 0px !important;
+}
+.bl-slick-slider-nav .slick-next{
+    right: 0px !important;
+    border-radius: 0px !important;
+}
+
+.bl-slick-slider-nav .slick-prev::before,
+.bl-slick-slider-nav .slick-next::before {
+  font-size: 24px;
+  color: #fff; /* or your preferred color */
+}
+
+.single-boat-details .boat-details .info-card{
+    margin-bottom: 20px;
+    padding: 0px;
+    /* box-shadow: 0px 0px 10px 5px #80808017; */
+}
+
+.single-boat-details .boat-details h4{
+    font-size: 30px;
+    font-weight: 600;
+    line-height: 36px;
+    color: #38bfef;
+}
+
+.single-boat-details .boat-details .location{
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 30px;
+    color: #000;
+}
+
+.single-boat-details .boat-details .info-card h5{
+    font-size: 20px !important;
+}
+.single-boat-details .boat-details .info-card li{
+    margin-bottom: 10px;
+    font-weight: 500 !important;
+    font-size: 16px !important;
+}
+.single-boat-details .boat-details .info-card li span{
+    font-weight: 400 !important;
+}
+
+.single-boat-details ul{
+    list-style: none;
+    padding: 0 !important;
+    margin: 10px 0px 10px 0px !important;
+}
+
+.single-boat-details .boat-details .boat-book-now{
+    background: #38bfef !important;
+    border-color: #38bfef !important;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+    box-shadow: 0px -5px 10px 0px rgba(0, 0, 0, 0.5) inset;
+    border-style: solid;
+    border-width: 1px 1px 1px 1px;
+    border-color: #38bfef !important;
+    border-radius: 5px 5px 5px 5px;
+    padding: 10px 30px 10px 30px;
+}
+
+.single-boat-details .boat-details .boat-book-now:hover{
+    background: transparent !important;
+    color: #38bfef;
+}
+
+.bl-single-full-boat-details {
+    display: flex;
+    justify-content: space-between;
+    border: 1px solid #ebe5e5;
+    margin: 40px 0px;
+    gap: 0px;
+}
+
+.bl-single-full-boat-details .details,
+.bl-single-full-boat-details .location,
+.bl-single-full-boat-details .price {
+    width: 33.33%;
+    border-right: 1px solid #ebe5e5;
+}
+.bl-single-full-boat-details .price{
+    border-right: 0px !important;
+}
+.bl-single-full-boat-details .title{
+    padding: 10px 20px;
+    border-bottom: 1px solid #ebe5e5;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.bl-single-full-boat-details .details .features {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px;
+    gap: 15px;
+}
+
+.bl-single-full-boat-details .location .l-features,
+.bl-single-full-boat-details .price .yachtPrice {
+    padding: 20px;
+}
+
+.bl-single-full-boat-details .details .features .f-title{
+    font-size: 16px;
+    line-height: 16px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    color: #38bfef;
+}
+.bl-single-full-boat-details .details .features .yachtdeails-info li,
+.bl-single-full-boat-details .location .l-features li {
+    font-size: 14px;
+    font-weight: 500;
+}
+.bl-single-full-boat-details .details .features .yachtdeails-info li span,
+.bl-single-full-boat-details .location .l-features li span {
+    font-weight: 400;
+}
+.bl-single-full-boat-details .location .l-features .boat-map{
+    margin-top: 20px;
+}
+
+.bl-single-full-boat-details .price .yachtPrice th {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.bl-single-full-boat-details .price .yachtPrice td{
+    font-size: 14px;
+}
+
+/* .boat-listing-tab.ui-widget-content{
+    border: none !important;
+    margin-top: 50px;
+}
+.boat-listing-tab .ui-widget-header {
+    border: none !important; 
+    background: transparent !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #fff;
+}
+.boat-listing-tab .ui-widget-header .ui-tabs-nav li{
+    border: none;
+    margin: 0px !important;
+}
+.boat-listing-tab .ui-widget-header li.ui-tabs-active{
+    background: #38bfef;
+}
+.boat-listing-tab .ui-widget-header .ui-state-default{
+    border: none !important;
+}
+.boat-listing-tab .ui-widget-header .ui-tabs-anchor {
+    padding: 15px 30px;
+}
+.boat-listing-tab .ui-tabs-panel{
+    border: 1px solid #80808000;
+    box-shadow: 0px 0px 30px 0px #8080804a;
+    padding: 30px !important;
+}
+.boat-listing-tab .yachtdeails{
+    display: flex;
+    column-gap: 80px;
+    row-gap: 30px;
+}
+.boat-listing-tab ul{
+    margin: 0px !important;
+    list-style: none;
+}
+.boat-listing-tab ul li{
+    margin: 10px 0px;
+    padding: 0px;
+} */
+
+/* search sytle */
+
+form#nausys-boat-filter-form {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* 5 equal columns */
+    gap: 10px;
+    padding: 20px;
+    box-shadow: 0px 0px 30px 0px #8080804a;
+    border-radius: 10px;
+    align-items: flex-end;
+}
+form#nausys-boat-filter-form label{
+    font-size: 18px !important;
+}
+
+form#nausys-boat-filter-form .select2-container {
+   width: 100% !important;
+}
+
+form#nausys-boat-filter-form  button.boat-search-btn {
+    height: 50px;
+}
+
+.boat-listing-select2-single {
+    height: 40px !IMPORTANT;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between !important;
+    margin: 5px 0px 0px 0px !important;
+}
+.boat-listing-select2-single .select2-selection__arrow{
+    position: relative !important;
+}
+.boat-listing-select2-single .select2-selection__rendered{
+    font-size: 16px !important;
+    line-height: 28px !important;
+}
+
+.boat-listing-select2-dropdown .select2-search__field{
+    height: 35px !important;
+}
+.boat-listing-select2-dropdown .select2-results__option--highlighted{
+    background: #38BFEF !important;
+}
+
+.boat-listing-select2-dropdown strong.select2-results__group {
+    display: none !important;
+}
+
+.boat-listing-select2-dropdown .select2-results__option--group {
+    padding-left: 0px !important;
+}
+.boat-listing-select2-dropdown .select2-results__option{
+    margin-left: 0px !important;
+    padding-left: 5px !important;
+}
+
+.boat-listing-select2-dropdown .select2-results__options--nested li.select2-results__option:first-child {
+    font-weight: 600 !important;
+}
+.boat-listing-select2-dropdown .select2-results__options--nested li.select2-results__option:not(:first-child) {
+    margin-left: 10px !important;
+}
+
+
+/* Boat filter page style  */
+
+.boat-listing-filter-wraper{
+    display: flex;
+    gap: 30px;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+}
+
+.boat-listing-filter-wraper .filter-bar-area {
+    width: 25%;
+    /* position: sticky; */
+    align-self: flex-start; /* prevents flex stretching */
+    height: fit-content; /* keeps height from stretching with flex */
+    /* top: 90px; */
+    z-index: 10;
+}
+
+.boat-listing-filter-wraper .filter-bar {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.boat-listing-filter-wraper .filter-bar .filter-fieldset {
+    box-shadow: 0px 0px 10px 0px #80808036;
+    padding: 10px;
+    margin: 15px 0px;
+    border-radius: 6px;
+}
+.boat-listing-filter-wraper .filter-bar .filter-fieldset label {
+    font-size: 16px;
+    font-weight: 600;
+}
+.boat-listing-filter-wraper .filter-bar .filter-fieldset input {
+    background: #fff;
+    margin: 5px 0px 0px 0px;
+}
+
+.boat-listing-filter-wraper .boat-listing-area {
+    width: 75%;
+    flex: 1;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list {
+    border: 1px solid #ccc;
+    height: 220px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-img img {
+    width: 100%;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info {
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    margin-top: 30px;
+    background: linear-gradient(135deg, #ffc107 0%, #fff3cd 100%);
+    color: #000;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info .title{
+    font-size: 20px !important;
+    line-height: 24px;
+    color: #000;
+    text-transform: uppercase;
+    margin: 0px;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info .title i {
+    font-size: 24px;
+    margin-right: 5px;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info p {
+    font-size: 16px;
+    color: #000;
+    line-height: 24px;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info ul{
+    list-style: none;
+    padding: 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info ul a{
+    font-size: 16px !important;
+    color: #000;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 1px;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info ul a:hover{
+    color: #4a3c3c;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info ul i{
+    font-size: 18px;
+    margin-right: 5px;
+    color: #000;
+    font-weight: 400;
+}
+.boat-listing-filter-wraper .filter-bar-area .contact-info button.need-help-btn {
+    margin-top: 20px;
+    background: #ffffff;
+    color: #000000;
+    padding: 8px 30px;
+    border: 1px solid #fff;
+    font-size: 18px;
+    border-radius: 6px;
+    text-transform: capitalize;
+    position: relative;
+    z-index: 0;
+}
+
+.boat-listing-filter-wraper .filter-bar-area .contact-info button.need-help-btn:before {
+    content: '';
+    background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    background-size: 400%;
+    z-index: -1;
+    filter: blur(5px);
+    width: calc(100% + 4px);
+    height: calc(100% + 4px);
+    animation: glowing 20s linear infinite;
+    opacity: 1; /* Always active */
+    transition: opacity 0.3s ease-in-out;
+    border-radius: 10px;
+}
+
+.boat-listing-filter-wraper .filter-bar-area .contact-info button.need-help-btn:after {
+    z-index: -1;
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    left: 0;
+    top: 0;
+    border-radius: 10px;
+}
+
+@keyframes glowing {
+    0% {
+        background-position: 0 0;
+    }
+    50% {
+        background-position: 400% 0;
+    }
+    100% {
+        background-position: 0 0;
+    }
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-img{
+    width: 30%;
+}
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-img img{
+    height: 100%;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info{
+    width: 45%;
+    padding: 15px 0px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info .boat-title a{
+    font-size: 18px;
+    line-height: 22px;
+    color: #000 !important;
+    font-weight: 500;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info .boat-title .boat-location{
+    font-size: 16px;
+    line-height: 22px;
+    color: rgb(51, 122, 204) !important;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info .other-title{
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info .features ul{
+    list-style: none;
+    padding: 0px;
+    margin: 0px;
+    display: flex;
+    text-align: center;
+    gap: 15px;
+}
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info .features ul li i{
+    font-size: 20px;
+    line-height: 0px;
+}
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info .features ul li span{
+    display: block;
+    line-height: 16px;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn {
+    width: 25%;
+    padding: 15px 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn button{
+    width: 100%;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn button.boat-book-now,
+button.boat-book-now {
+    background: #38bfef !important;
+    border-color: #38bfef !important;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+    box-shadow: 0px -5px 10px 0px rgba(0, 0, 0, 0.5) inset;
+    border-style: solid;
+    border-width: 1px 1px 1px 1px;
+    border-color: #38bfef !important;
+    border-radius: 5px 5px 5px 5px;
+    padding: 12px 30px 12px 30px;
+    display: inline-flex;
+    justify-content: center;
+}
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn button.boat-book-now:hover {
+    background: transparent !important;
+    color: #38bfef;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn button.boat-view {
+    background: transparent;
+    color: #38bfef;
+    border: 1px solid #38bfef;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 20px;
+    border-radius: 5px 5px 5px 5px;
+    display: inline-flex;
+    justify-content: center;
+    gap: 5px;
+    box-shadow: 0px -5px 10px 0px rgba(0, 0, 0, 0.5) inset;
+    border-style: solid;
+    padding: 12px 30px 12px 30px;
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn button.boat-view i {
+    transition: transform 0.3s ease;
+    transform: rotate(-36deg);
+
+}
+
+.boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn button.boat-view:hover i.ri-arrow-right-line {
+    transform: translateX(5px) !important; /* icon moves right on hover */
+}
+
+.boat-listing-filter-wraper .filter-summary-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    background: #f0f8ff;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.boat-listing-filter-wraper .filtered-lists {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.boat-listing-filter-wraper .active-filter {
+    background: #d0e9ff;
+    border: 1px solid #91c9ff;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.boat-listing-filter-wraper .active-filter .remove-filter {
+    margin-left: 8px;
+    cursor: pointer;
+    color: #c00;
+    font-weight: bold;
+}
+
+.boat-listing-filter-wraper .reset-button {
+    padding: 4px 12px;
+    background: transparent;
+    color: #ff0000;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+    border: 1px solid red;
+}
+
+
+
+.boat-listing-filter-wraper .boat-count-and-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 10px;
+}
+.boat-listing-filter-wraper .boat-count-message {
+    font-weight: 600;
+    font-size: 16px;
+    color: #2a2a2a;
+
+    /* Optional padding for spacing */
+    padding: 5px 0;
+}
+.boat-listing-filter-wraper .pagination{
+    margin: 5px 0px;
+    display: flex;
+    justify-content: left;
+}
+.boat-listing-filter-wraper .bl-page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;        /* fixed width */
+    height: 36px;       /* fixed height */
+    margin: 0 4px;
+    border: 1px solid #000000;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #333;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+.boat-listing-filter-wraper .bl-page:focus{
+    border: none;
+    outline: none;
+    box-shadow: none;
+}
+.boat-listing-filter-wraper .bl-page.active,
+.boat-listing-filter-wraper .bl-page:hover {
+    background-color: #000000;
+    color: #fff;
+    border-color: #000000;
+}
+
+/* Book Now Modal Style */
+.boat-listing-date-range .startRange,
+.boat-listing-date-range .inRange,
+.boat-listing-date-range .endRange{
+    background-color: #000 !important;
+    color: #fff !important;
+    border-color: #000 !important;
+}
+.boat-listing-date-range .inRange{
+    -webkit-box-shadow: -5px 0 0 #000000, 5px 0 0 #000000 !important;
+    box-shadow: -5px 0 0 #000000, 5px 0 0 #000000 !important;
+}
+.boat-listing-date-range .flatpickr-day.flatpickr-disabled {
+    color: #000000 !important;
+    text-decoration: line-through !important;
+}
+.boat-listing-input-text{
+    height: 38px !important;
+    border-radius: 5px !important;
+    border: 1px solid #ccc !important;
+    padding: 12px !important;
+}
+.boat-listing-input-text:hover,
+.boat-listing-input-text:focus,
+.boat-listing-input-textarea:hover,
+.boat-listing-input-textarea:focus{
+    border: 1px solid #000000 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+.boat-listing-input-textarea{
+    border-radius: 5px !important;
+    border: 1px solid #ccc !important;
+    padding: 12px !important;
+}
+.boat-listing-modal-header{
+    padding: 15px 25px !important;
+}
+.boat-listing-modal-body {
+    padding: 0px 25px 25px !important;
+}
+#boatBookingModal .modal-title{
+    margin-bottom: 0px !important;
+}
+#boatBookingModal label{
+    padding: 20px 0px 10px 0px !important;
+    font-size: 16px;
+    font-weight: 500;
+}
+#boatBookingModal .boat-location{
+    color: rgb(51, 122, 204) !important;
+    font-size: 18px;
+}
+#boatBookingModal .boat-title {
+    color: #000 !important;
+    font-size: 22px;
+    font-weight: 700;
+}
+#boatBookingModal .btn-close{
+    color: #000 !important;
+    border: none !important;
+    cursor: pointer;
+}
+
+#boatBookingModal .btn-close:focus{
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+#boatBookingModal ul{
+    margin: 0px !important;
+}
+#boatBookingModal .select2-search__field{
+    margin: 0px !important;
+    border: none !important;
+    padding: 5px !important;
+}
+#boatBookingModal .select2-selection--multiple{
+    border: 1px solid #ccc !important;
+    min-height: 38px !important;
+    border-radius: 5px !important;
+}
+
+#boatBookingModal .book-now-on-popup{
+    margin-top: 16px;
+    color: #fff !important;
+    background: #38bfef !important;
+    border-color: #38bfef !important;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 500;
+    box-shadow: 0px -5px 10px 0px rgba(0, 0, 0, 0.5) inset;
+    border-style: solid;
+    border-width: 1px 1px 1px 1px;
+    border-color: #38bfef !important;
+    border-radius: 5px 5px 5px 5px;
+    padding: 12px 30px 12px 30px;
+    display: inline-flex;
+    justify-content: center;
+}
+
+#boatBookingModal .book-now-on-popup:hover{
+    background: transparent !important;
+    color: #38bfef !important;
+}
+
+#boatBookingModal .invalid-feedback {
+    font-size: 14px;
+}
+
+.price-info {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 400;
+}
+
+.price-info--hint {
+    font-weight: normal;
+    font-size: 13px;
+    color: #666;
+}
+
+.bl-spinner {
+    width: 18px;
+    height: 18px;
+    border: 3px solid #e5e5e5;
+    border-top: 3px solid #777;
+    border-radius: 50%;
+    animation: blspin 0.8s linear infinite;
+}
+
+@keyframes blspin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+

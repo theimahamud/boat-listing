@@ -1,0 +1,135 @@
+
+@media screen and (max-width:1300px){
+
+    .boat-listing-filter-wraper .filter-bar-area {
+        width: 35%;
+    }
+}
+
+@media screen and (max-width:767px){
+
+    .boat-listing-filter-wraper{
+        display: flex;
+        flex-direction: column;
+    }
+
+    .boat-listing-filter-wraper .filter-bar-area,
+    .boat-listing-filter-wraper .boat-listing-area {
+        width: 100%;
+        position: relative;
+        top: 0;
+    }
+    .boat-listing-filter-wraper .filter-bar-area .contact-info{
+        display: none;
+    }
+
+    .single-boat-details {
+        gap: 20px;
+        flex-direction: column;
+    }
+
+    .single-boat-details .single-boat-img {
+        width: 100% !important;
+    }
+
+    .boat-listing-filter-wraper .boat-listing-area .boat-list {
+        height: auto !important;
+    }
+
+    .boat-listing-filter-wraper .bl-page {
+        width: 30px;
+        height: 30px;
+    }
+
+    .boat-listing-filter-wraper .boat-count-and-pagination {
+        flex-direction: column !important;
+    }
+    .bl-slick-slider .slick-slide {
+        height: 270px;
+        background: #fff !important;
+    }
+
+    button.f-button.is-arrow.is-next,
+    button.f-button.is-arrow.is-prev {
+        padding: 0px !important;
+    }
+    .f-carousel__toolbar.is-absolute button {
+        padding: 0px;
+    }
+
+    .boat-listing-tab .ui-widget-header {
+        flex-wrap: wrap;
+        margin-bottom: 10px !important;
+    }
+
+    .bl-slick-slider-nav .slick-slide {
+        width: 80px !important;
+        height: 60px;
+        margin: 5px;
+    }
+
+    .bl-slick-slider-nav .slick-prev, .bl-slick-slider-nav .slick-next {
+        
+        height: 68px;
+        width: 40px !important;
+        padding: 0px !important;
+    }
+
+    .bl-single-full-boat-details {
+        flex-direction: column;
+    }
+
+    .bl-single-full-boat-details .details,
+    .bl-single-full-boat-details .location,
+    .bl-single-full-boat-details .price {
+        width: 100%;
+        border-bottom: 0px;
+    }
+
+}
+
+@media screen and (max-width:480px){
+    .boat-listing-filter-wraper .boat-listing-area .boat-list {
+
+        flex-direction: column;
+        gap: 0px;
+    }
+
+    .boat-listing-filter-wraper .boat-listing-area .boat-list .boat-img {
+        width: 100%;
+    }
+
+    .boat-listing-filter-wraper .boat-listing-area .boat-list .boat-info {
+        width: 100%;
+        padding: 15px 15px 0px 15px;
+    
+    }
+
+    .boat-listing-filter-wraper .boat-listing-area .boat-list .boat-btn {
+        width: 100%;
+        display: flex !important;
+        flex-direction: row;
+    }
+
+    #boat-booking-form .col-4{
+        width: 100%;
+    }
+
+    .boat-listing-tab .ui-tabs-panel {
+        padding: 20px !important;
+    }
+
+    .boat-listing-filter-wraper .boat-listing-area .boat-list {
+        height: auto !important;
+    }
+
+    .boat-listing-filter-wraper .bl-page {
+        width: 30px;
+        height: 30px;
+    }
+
+    .boat-listing-filter-wraper .boat-count-and-pagination {
+        flex-direction: column !important;
+    }
+
+}
