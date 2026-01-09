@@ -45,6 +45,7 @@ define( 'BL_API_KEY', '1ee7-6ec10329a42145148a4a447d18cd7ea1245d7d992df2f5c30319
 require_once plugin_dir_path(__FILE__) . 'includes/class-boat-listing-activator.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-boat-listing-deactivator.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-boat-listing.php';
+require_once plugin_dir_path(__FILE__) . 'boat-listing/filter-desired-boat-shortcode.php';
 
 /**
  * --------------------------------------------------

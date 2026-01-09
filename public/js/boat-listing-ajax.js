@@ -1,5 +1,3 @@
-
-
 (function($){
 
 
@@ -197,16 +195,6 @@
             }
         });
     }
-
-
-    // 🎯 Load boats on page load - with delay to ensure date picker is initialized
-    // Increased delay to 800ms to ensure flatpickr completes initialization and sets default dates
-    setTimeout(function() {
-        console.log('🚀 Initial page load - checking date field...');
-        var initialDateValue = $('#search_free_yacht').val();
-        console.log('📅 Date field value:', initialDateValue || '(empty)');
-        loadBoats(1); // Initial load with "Today → +7 days"
-    }, 800);
 
     // Load first page on page load
     $(document).on('change', '#boat_charter_type, #search_free_yacht, #boat_model, #boat_company, #boat_location, #boat_cabin, #boat_year, #boat_category, #boat_person', function () {

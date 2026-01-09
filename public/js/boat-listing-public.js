@@ -202,20 +202,6 @@
 			}
 		});
 
-		// 🎯 Reset date picker to default "Today → +7 days"
-		if (typeof flatpickrInstance !== 'undefined' && flatpickrInstance) {
-			const today = new Date();
-			const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-			flatpickrInstance.setDate([today, nextWeek]);
-
-			// Manually format and set the input value
-			const fromDate = flatpickrInstance.formatDate(today, "d.m.Y");
-			const toDate = flatpickrInstance.formatDate(nextWeek, "d.m.Y");
-			$('#search_free_yacht').val(`${fromDate} to ${toDate}`);
-
-			console.log('🔄 Reset filters - Date restored to:', `${fromDate} to ${toDate}`);
-		}
-
 		renderActiveFilters();
 
 		// ✅ Trigger boat reload after Select2 has time to update its UI
@@ -240,53 +226,45 @@
 		});
 
 
-	// Date range picker - Auto-select "Today to +7 days" for immediate price display
-	flatpickrInstance = flatpickr(".bl-date-range-picker", {
-		mode: "range",
-		minDate: "today",
-		dateFormat: "d.m.Y",
-		// 🎯 Auto-select today to +7 days on page load
-		defaultDate: [new Date(), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)],
-		disable: [
-			function(date) {
-				// disable every multiple of 360
-				return !(date.getDate() % 360);
-			}
-		],
-		onReady: function(selectedDates, dateStr, instance) {
-			instance.calendarContainer.classList.add('boat-listing-date-range');
+	// Date range picker - No auto-select for immediate price display
+        flatpickrInstance = flatpickr(".bl-date-range-picker", {
+            mode: "range",
+            minDate: "today",
+            dateFormat: "d.m.Y",
 
-			// 🎯 Auto-fill the input field with formatted date range on page load
-			if (selectedDates.length === 2) {
-				const fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
-				const toDate = instance.formatDate(selectedDates[1], "d.m.Y");
-				const formattedRange = `${fromDate} to ${toDate}`;
-				instance.input.value = formattedRange;
+            // 🚫 No default date at all
+            defaultDate: null,
 
-				// Force update via jQuery to ensure value is set
-				$(instance.input).val(formattedRange);
+            disable: [
+                function (date) {
+                    return !(date.getDate() % 360);
+                }
+            ],
 
-				console.log('📅 Flatpickr initialized with dates:', formattedRange);
-			}
-		},
-		onChange: function(selectedDates, dateStr, instance) {
-			// Only set the input value when both from and to dates are selected
-			if (selectedDates.length === 2) {
-				const fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
-				const toDate = instance.formatDate(selectedDates[1], "d.m.Y");
-				instance.input.value = `${fromDate} to ${toDate}`;
+            onReady: function (selectedDates, dateStr, instance) {
+                instance.calendarContainer.classList.add('boat-listing-date-range');
 
-				// ✅ Trigger the AJAX filter only now
-				$(instance.input).trigger('change');
-			} else {
-				// Clear input while user is still choosing range
-				instance.input.value = "";
-			}
-		}
-	});
+                // ✅ Force empty input on load
+                instance.clear();
+                instance.input.value = "";
+            },
 
-	
-	});
+            onChange: function (selectedDates, dateStr, instance) {
+                // Only when full range is selected
+                if (selectedDates.length === 2) {
+                    const fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
+                    const toDate = instance.formatDate(selectedDates[1], "d.m.Y");
+
+                    instance.input.value = `${fromDate} to ${toDate}`;
+
+                    // Trigger AJAX filter only now
+                    $(instance.input).trigger("change");
+                } else {
+                    instance.input.value = "";
+                }
+            }
+        });
+    });
 
 
 })( jQuery );
