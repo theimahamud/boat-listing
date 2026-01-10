@@ -4,29 +4,6 @@
 	/**
 	 * All of the code for your public-facing JavaScript source
 	 * should reside in this file.
-	 *
-	 * Note: It has been assumed you will write jQuery code here, so the
-	 * $ function reference has been prepared for usage within the scope
-	 * of this function.
-	 *
-	 * This enables you to define handlers, for when the DOM is ready:
-	 *
-	 * $(function() {
-	 *
-	 * });
-	 *
-	 * When the window is loaded:
-	 *
-	 * $( window ).load(function() {
-	 *
-	 * });
-	 *
-	 * ...and/or other possibilities.
-	 *
-	 * Ideally, it is not considered best practise to attach more than a
-	 * single DOM-ready or window-load handler for a particular page.
-	 * Although scripts in the WordPress core, Plugins and Themes may be
-	 * practising this, we should strive to set a better example in our own work.
 	 */
 
 	// In your Javascript (external .js resource or <script> tag)
@@ -36,7 +13,6 @@
 		var flatpickrInstance;
 
 		// remove duplicate item from select2
-		//let seen = {};
 		$('.boat-listing-select2').each(function() {
 			let seen = {}; // reset for each select
 			$(this).find('option').each(function() {
@@ -55,8 +31,7 @@
 			selectionCssClass: 'boat-listing-select2-single'  // applies to selected container
 		});
 
-
-		 $('.bl-slick-slider').slick({
+		$('.bl-slick-slider').slick({
 			slidesToShow: 1,
 			slidesToScroll: 1,
 			arrows: false,
@@ -76,7 +51,7 @@
 		// Fancybox init (optional config, can be omitted if defaults are okay)
 		Fancybox.bind('[data-fancybox="gallery"]', {
 			Thumbs: {
-			autoStart: true
+				autoStart: true
 			}
 		});
 
@@ -107,90 +82,132 @@
 			ordering: true, // allows sorting
 		});
 
+		// Date range picker - No auto-select for immediate price display
+		flatpickrInstance = flatpickr(".bl-date-range-picker", {
+			mode: "range",
+			minDate: "today",
+			dateFormat: "d.m.Y",
+			defaultDate: null,
 
-	// Date range picker - No auto-select for immediate price display
-        flatpickrInstance = flatpickr(".bl-date-range-picker", {
-            mode: "range",
-            minDate: "today",
-            dateFormat: "d.m.Y",
-            defaultDate: null,
+			disable: [
+				function (date) {
+					return !(date.getDate() % 360);
+				}
+			],
 
-            disable: [
-                function (date) {
-                    return !(date.getDate() % 360);
-                }
-            ],
+			onReady: function (selectedDates, dateStr, instance) {
+				instance.calendarContainer.classList.add('boat-listing-date-range');
 
-            onReady: function (selectedDates, dateStr, instance) {
-                instance.calendarContainer.classList.add('boat-listing-date-range');
+				// ✅ Force empty input on load
+				instance.clear();
+				instance.input.value = "";
+			},
 
-                // ✅ Force empty input on load
-                instance.clear();
-                instance.input.value = "";
-            },
+			onChange: function (selectedDates, dateStr, instance) {
+				// Only when full range is selected
+				if (selectedDates.length === 2) {
+					var fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
+					var toDate = instance.formatDate(selectedDates[1], "d.m.Y");
 
-            onChange: function (selectedDates, dateStr, instance) {
-                // Only when full range is selected
-                if (selectedDates.length === 2) {
-                    const fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
-                    const toDate = instance.formatDate(selectedDates[1], "d.m.Y");
+					instance.input.value = fromDate + " to " + toDate;
 
-                    instance.input.value = `${fromDate} to ${toDate}`;
+					// Trigger AJAX filter only now
+					$(instance.input).trigger("change");
+				} else {
+					instance.input.value = "";
+				}
+			}
+		});
 
-                    // Trigger AJAX filter only now
-                    $(instance.input).trigger("change");
-                } else {
-                    instance.input.value = "";
-                }
-            }
-        });
+		// 🏠 Home page date picker - Auto-select tomorrow + 7 days
+		flatpickr(".bl-home-date-range-picker", {
+			mode: "range",
+			minDate: "today",
+			dateFormat: "d.m.Y",
 
-        $('#filter-desired-boat-form').on('submit', function () {
+			// Auto-select tomorrow + 7 days
+			defaultDate: [
+				new Date(new Date().setDate(new Date().getDate() + 1)), // Tomorrow
+				new Date(new Date().setDate(new Date().getDate() + 8))  // Tomorrow + 7 days
+			],
 
-            var $dateInput = $('#dateRange');
-            var dateValue  = $.trim($dateInput.val());
+			disable: [
+				function (date) {
+					return !(date.getDate() % 360);
+				}
+			],
 
-            if (!dateValue) return;
+			onReady: function (selectedDates, dateStr, instance) {
+				instance.calendarContainer.classList.add('boat-listing-date-range');
 
-            var parts = [];
+				// Format and display the auto-selected dates
+				if (selectedDates.length === 2) {
+					var fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
+					var toDate = instance.formatDate(selectedDates[1], "d.m.Y");
+					instance.input.value = fromDate + " to " + toDate;
+				}
+			},
 
-            // Handle both "to" and "-"
-            if (dateValue.indexOf(' to ') !== -1) {
-                parts = dateValue.split(' to ');
-            } else if (dateValue.indexOf(' - ') !== -1) {
-                parts = dateValue.split(' - ');
-            }
+			onChange: function (selectedDates, dateStr, instance) {
+				// Only when full range is selected
+				if (selectedDates.length === 2) {
+					var fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
+					var toDate = instance.formatDate(selectedDates[1], "d.m.Y");
 
-            if (parts.length !== 2) return;
+					instance.input.value = fromDate + " to " + toDate;
 
-            function toApiFormat(dateStr) {
-                var d = $.trim(dateStr).split('.');
-                return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
-            }
+					// Trigger AJAX filter
+					$(instance.input).trigger("change");
+				} else {
+					instance.input.value = "";
+				}
+			}
+		});
 
-            $('#dateFrom').val(toApiFormat(parts[0]));
-            $('#dateTo').val(toApiFormat(parts[1]));
+		$('#filter-desired-boat-form').on('submit', function () {
+			var $dateInput = $('#dateRange');
+			var dateValue  = $.trim($dateInput.val());
 
-            // Remove raw date field from request
-            $dateInput.prop('disabled', true);
-        });
-    });
+			if (!dateValue) return;
+
+			var parts = [];
+
+			// Handle both "to" and "-"
+			if (dateValue.indexOf(' to ') !== -1) {
+				parts = dateValue.split(' to ');
+			} else if (dateValue.indexOf(' - ') !== -1) {
+				parts = dateValue.split(' - ');
+			}
+
+			if (parts.length !== 2) return;
+
+			function toApiFormat(dateStr) {
+				var d = $.trim(dateStr).split('.');
+				return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
+			}
+
+			$('#dateFrom').val(toApiFormat(parts[0]));
+			$('#dateTo').val(toApiFormat(parts[1]));
+
+			// Remove raw date field from request
+			$dateInput.prop('disabled', true);
+		});
+	});
 
 })( jQuery );
 
-
-// Open Hubspot chat box 
+// Open Hubspot chat box
 (function waitForHubSpotAndButton() {
-    // Try every 500ms to see if both HubSpot and the button are ready
-    const interval = setInterval(() => {
-        const hsWidgetReady = window.HubSpotConversations && window.HubSpotConversations.widget;
-        const chatButton = document.getElementById('boat-listing-open-hubspot-chat-box');
+	// Try every 500ms to see if both HubSpot and the button are ready
+	var interval = setInterval(function() {
+		var hsWidgetReady = window.HubSpotConversations && window.HubSpotConversations.widget;
+		var chatButton = document.getElementById('boat-listing-open-hubspot-chat-box');
 
-        if (hsWidgetReady && chatButton) {
-            chatButton.addEventListener('click', () => {
-                window.HubSpotConversations.widget.open();
-            });
-            clearInterval(interval); // Stop checking
-        }
-    }, 500);
+		if (hsWidgetReady && chatButton) {
+			chatButton.addEventListener('click', function() {
+				window.HubSpotConversations.widget.open();
+			});
+			clearInterval(interval); // Stop checking
+		}
+	}, 500);
 })();

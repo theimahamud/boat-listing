@@ -14,6 +14,12 @@ function filter_desired_boat_shortcode() {
     $remainingCountries = $data['countries'];
     $priorityCountries  = $data['priority'] ?? [];
 
+    // ========== AUTO-SELECT DEFAULTS ==========
+    // Default selections (dates handled by flatpickr in JS)
+    $default_destination = 'VG'; // British Virgin Islands country code
+    $default_product = 'Crewed';
+    // ==========================================
+
     ob_start();
     ?>
     <div class="filter-desired-boat-container" style="background: #f8f9fa; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 1000px; margin: 0 auto;">
@@ -37,7 +43,8 @@ function filter_desired_boat_shortcode() {
                     <?php if (!empty($priorityCountries)): ?>
                         <optgroup label="🌟 Popular Destinations">
                             <?php foreach ($priorityCountries as $country): ?>
-                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>">
+                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>"
+                                        <?php selected($country['country_data']['shortName'], $default_destination); ?>>
                                     <?php echo esc_html($country['country_data']['name']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -56,7 +63,8 @@ function filter_desired_boat_shortcode() {
                         ?>
                         <optgroup label="🌍 <?php echo esc_html($regionName); ?>">
                             <?php foreach ($regionCountries as $country): ?>
-                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>">
+                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>"
+                                        <?php selected($country['country_data']['shortName'], $default_destination); ?>>
                                     <?php echo esc_html($country['country_data']['name']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -75,7 +83,8 @@ function filter_desired_boat_shortcode() {
                         style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white;">
                     <option value="">Choose Charter Type</option>
                     <?php foreach ($getBoatProductTypes as $productType): ?>
-                        <option value="<?php echo esc_attr($productType); ?>">
+                        <option value="<?php echo esc_attr($productType); ?>"
+                                <?php selected($productType, $default_product); ?>>
                             ⛵ <?php echo esc_html($productType); ?>
                         </option>
                     <?php endforeach; ?>
@@ -91,7 +100,7 @@ function filter_desired_boat_shortcode() {
                        placeholder="Select your travel dates"
                        autocomplete="off" required
                        style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white;"
-                       class="boat-listing-input-text bl-date-range-picker" />
+                       class="boat-listing-input-text bl-home-date-range-picker" />
             </div>
 
             <!-- Hidden API fields for form processing -->
@@ -136,184 +145,207 @@ function filter_desired_boat_shortcode() {
         </form>
     </div>
 
-    <script>
-    jQuery(document).ready(function($) {
+    <script type="text/javascript">
+    (function() {
+        'use strict';
 
-        // Simple form submission - only essential parameters
-        $('#filter-desired-boat-form').on('submit', function(e) {
-            e.preventDefault();
-
-            console.log('🏠 Simple boat search form submitted');
-
-            var params = [];
-
-            // Get only the essential fields
-            var country = $('#country').val();
-            var productName = $('#productName').val();
-            var dateRange = $('#dateRange').val();
-
-            console.log('Form values:', {
-                country: country,
-                productName: productName,
-                dateRange: dateRange
-            });
-
-            // Validate required fields
-            if (!country) {
-                alert('🌍 Please select a destination');
-                $('#country').focus();
-                return false;
-            }
-
-            if (!productName) {
-                alert('⛵ Please select a charter type');
-                $('#productName').focus();
-                return false;
-            }
-
-            if (!dateRange) {
-                alert('📅 Please select your travel dates');
-                $('#dateRange').focus();
-                return false;
-            }
-
-            // Add core parameters
-            params.push('country=' + encodeURIComponent(country));
-            params.push('productName=' + encodeURIComponent(productName));
-
-            // Add all hidden field parameters (if they have values)
-            var hiddenFields = [
-                'charterType', 'person', 'cabin', 'year', 'berths', 'wc',
-                'minLength', 'maxLength', 'companyId', 'baseFromId',
-                'baseToId', 'sailingAreaId', 'modelId', 'flexibility'
-            ];
-
-            // Add all hidden field parameters (essential for API filtering)
-            var hiddenFields = [
-                'charterType', 'person', 'cabin', 'year', 'berths', 'wc',
-                'minLength', 'maxLength', 'companyId', 'baseFromId',
-                'baseToId', 'sailingAreaId', 'modelId', 'flexibility'
-            ];
-
-            hiddenFields.forEach(function(fieldName) {
-                var fieldValue = $('#hidden_' + fieldName).val();
-                // Include all parameters for API filtering (empty values are meaningful for API)
-                params.push(fieldName + '=' + encodeURIComponent(fieldValue || ''));
-                if (fieldValue && fieldValue.trim() !== '') {
-                    console.log('  - Added hidden field ' + fieldName + ': ' + fieldValue);
-                }
-            });
-
-            console.log('🔍 Hidden fields being passed:', hiddenFields.filter(function(field) {
-                return $('#hidden_' + field).val();
-            }));
-
-            // Handle date range conversion to API format
-            if (dateRange) {
-                var parts = [];
-                if (dateRange.indexOf(' to ') !== -1) {
-                    parts = dateRange.split(' to ');
-                } else if (dateRange.indexOf(' - ') !== -1) {
-                    parts = dateRange.split(' - ');
-                }
-
-                if (parts.length === 2) {
-                    // Convert DD.MM.YYYY to YYYY-MM-DDTHH:mm:ss
-                    function toIsoFormat(dateStr) {
-                        var d = dateStr.trim().split('.');
-                        if (d.length === 3) {
-                            return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
-                        }
-                        return '';
-                    }
-
-                    var dateFrom = toIsoFormat(parts[0]);
-                    var dateTo = toIsoFormat(parts[1]);
-
-                    if (dateFrom && dateTo) {
-                        params.push('dateFrom=' + encodeURIComponent(dateFrom));
-                        params.push('dateTo=' + encodeURIComponent(dateTo));
-                    }
-                }
-            }
-
-            // Build clean URL with only essential parameters
-            var targetUrl = '/boat/boat-filter';
-            if (params.length > 0) {
-                targetUrl += '?' + params.join('&');
-            }
-
-            console.log('🔗 Redirecting to: ' + targetUrl);
-            console.log('📋 Essential parameters only:', params);
-
-            // Redirect to filter page
-            window.location.href = targetUrl;
-        });
-
-        // Add some visual feedback for form interaction
-        $('#country, #productName').on('change', function() {
-            if ($(this).val()) {
-                $(this).css('border-color', '#27ae60');
-            } else {
-                $(this).css('border-color', '#ddd');
-            }
-        });
-
-        $('#dateRange').on('change', function() {
-            if ($(this).val()) {
-                $(this).css('border-color', '#27ae60');
-            } else {
-                $(this).css('border-color', '#ddd');
-            }
-        });
-
-        // Function to populate hidden fields from URL parameters
-        function populateHiddenFieldsFromUrl() {
-            var urlParams = new URLSearchParams(window.location.search);
-
-            console.log('🔄 Checking URL for existing filter parameters...');
-
-            // Update hidden fields with URL parameters
-            var hiddenFields = [
-                'charterType', 'person', 'cabin', 'year', 'berths', 'wc',
-                'minLength', 'maxLength', 'companyId', 'baseFromId',
-                'baseToId', 'sailingAreaId', 'modelId', 'flexibility'
-            ];
-
-            hiddenFields.forEach(function(fieldName) {
-                var urlValue = urlParams.get(fieldName);
-                // Set the value from URL (including empty for API consistency)
-                $('#hidden_' + fieldName).val(urlValue || '');
-                if (urlValue && urlValue.trim() !== '') {
-                    console.log('  - Updated hidden field ' + fieldName + ': ' + urlValue);
-                }
-            });
-
-            // Also populate visible fields if they exist in URL
-            if (urlParams.get('country')) {
-                $('#country').val(urlParams.get('country'));
-            }
-            if (urlParams.get('productName')) {
-                $('#productName').val(urlParams.get('productName'));
-            }
-            if (urlParams.get('dateFrom') && urlParams.get('dateTo')) {
-                var dateFrom = urlParams.get('dateFrom').replace('T00:00:00', '');
-                var dateTo = urlParams.get('dateTo').replace('T00:00:00', '');
-
-                function formatDateForDisplay(isoDate) {
-                    var parts = isoDate.split('-');
-                    return parts[2] + '.' + parts[1] + '.' + parts[0];
-                }
-
-                var displayDate = formatDateForDisplay(dateFrom) + ' to ' + formatDateForDisplay(dateTo);
-                $('#dateRange').val(displayDate);
-            }
+        if (typeof jQuery === 'undefined') {
+            console.error('jQuery is required for filter-desired-boat shortcode');
+            return;
         }
 
-        // Populate hidden fields when page loads (in case user came back from filter page)
-        populateHiddenFieldsFromUrl();
+        jQuery(document).ready(function($) {
 
-    });
+            // ========== AUTO-SELECT DEFAULTS ON PAGE LOAD ==========
+            // console.log('Home page loaded - Setting default values');
+
+            // Only set defaults if user hasn't come from filter page (no URL params)
+            var urlParams = new URLSearchParams(window.location.search);
+            var hasExistingParams = urlParams.get('country') || urlParams.get('productName') || urlParams.get('dateFrom');
+
+            if (!hasExistingParams) {
+                // console.log('Setting defaults: British Virgin Islands, Crewed');
+                // console.log('Dates will be auto-set by flatpickr (tomorrow + 7 days)');
+
+                // Set destination to British Virgin Islands
+                $('#country').val(<?php echo json_encode($default_destination); ?>).trigger('change');
+
+                // Set product to Crewed
+                $('#productName').val(<?php echo json_encode($default_product); ?>).trigger('change');
+
+                // Dates are handled by flatpickr (see flatpickr configuration)
+            } else {
+                // console.log('User returned from filter page - preserving their selections');
+            }
+            // =======================================================
+
+            // Simple form submission - only essential parameters
+            $('#filter-desired-boat-form').on('submit', function(e) {
+                e.preventDefault();
+
+               // console.log('Simple boat search form submitted');
+
+                var params = [];
+
+                // Get only the essential fields
+                var country = $('#country').val();
+                var productName = $('#productName').val();
+                var dateRange = $('#dateRange').val();
+
+               // console.log('Form values:');
+               // console.log('Country: ' + country);
+               // console.log('ProductName: ' + productName);
+               // console.log('DateRange: ' + dateRange);
+
+                // Validate required fields
+                if (!country) {
+                    alert('🌍 Please select a destination');
+                    $('#country').focus();
+                    return false;
+                }
+
+                if (!productName) {
+                    alert('⛵ Please select a charter type');
+                    $('#productName').focus();
+                    return false;
+                }
+
+                if (!dateRange) {
+                    alert('📅 Please select your travel dates');
+                    $('#dateRange').focus();
+                    return false;
+                }
+
+                // Add core parameters
+                params.push('country=' + encodeURIComponent(country));
+                params.push('productName=' + encodeURIComponent(productName));
+
+                // Add all hidden field parameters (if they have values)
+                var hiddenFields = [
+                    'charterType', 'person', 'cabin', 'year', 'berths', 'wc',
+                    'minLength', 'maxLength', 'companyId', 'baseFromId',
+                    'baseToId', 'sailingAreaId', 'modelId', 'flexibility'
+                ];
+
+                // Add all hidden field parameters (essential for API filtering)
+                hiddenFields.forEach(function(fieldName) {
+                    var fieldValue = $('#hidden_' + fieldName).val();
+                    // Include all parameters for API filtering (empty values are meaningful for API)
+                    params.push(fieldName + '=' + encodeURIComponent(fieldValue || ''));
+                    if (fieldValue && fieldValue.trim() !== '') {
+                       // console.log('  - Added hidden field ' + fieldName + ': ' + fieldValue);
+                    }
+                });
+
+                // console.log('Hidden fields being passed for field: ' + field);
+
+                // Handle date range conversion to API format
+                if (dateRange) {
+                    var parts = [];
+                    if (dateRange.indexOf(' to ') !== -1) {
+                        parts = dateRange.split(' to ');
+                    } else if (dateRange.indexOf(' - ') !== -1) {
+                        parts = dateRange.split(' - ');
+                    }
+
+                    if (parts.length === 2) {
+                        // Convert DD.MM.YYYY to YYYY-MM-DDTHH:mm:ss
+                        function toIsoFormat(dateStr) {
+                            var d = dateStr.trim().split('.');
+                            if (d.length === 3) {
+                                return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
+                            }
+                            return '';
+                        }
+
+                        var dateFrom = toIsoFormat(parts[0]);
+                        var dateTo = toIsoFormat(parts[1]);
+
+                        if (dateFrom && dateTo) {
+                            params.push('dateFrom=' + encodeURIComponent(dateFrom));
+                            params.push('dateTo=' + encodeURIComponent(dateTo));
+                        }
+                    }
+                }
+
+                // Build clean URL with only essential parameters
+                var targetUrl = '/boat/boat-filter';
+                if (params.length > 0) {
+                    targetUrl += '?' + params.join('&');
+                }
+
+                // console.log('Redirecting to: ' + targetUrl);
+                // console.log('Essential parameters: ' + params.join(', '));
+
+                // Redirect to filter page
+                window.location.href = targetUrl;
+            });
+
+            // Add some visual feedback for form interaction
+            $('#country, #productName').on('change', function() {
+                if ($(this).val()) {
+                    $(this).css('border-color', '#27ae60');
+                } else {
+                    $(this).css('border-color', '#ddd');
+                }
+            });
+
+            $('#dateRange').on('change', function() {
+                if ($(this).val()) {
+                    $(this).css('border-color', '#27ae60');
+                } else {
+                    $(this).css('border-color', '#ddd');
+                }
+            });
+
+            // Function to populate hidden fields from URL parameters
+            function populateHiddenFieldsFromUrl() {
+                var urlParams = new URLSearchParams(window.location.search);
+
+               // console.log('Checking URL for existing filter parameters...');
+
+                // Update hidden fields with URL parameters
+                var hiddenFields = [
+                    'charterType', 'person', 'cabin', 'year', 'berths', 'wc',
+                    'minLength', 'maxLength', 'companyId', 'baseFromId',
+                    'baseToId', 'sailingAreaId', 'modelId', 'flexibility'
+                ];
+
+                hiddenFields.forEach(function(fieldName) {
+                    var urlValue = urlParams.get(fieldName);
+                    // Set the value from URL (including empty for API consistency)
+                    $('#hidden_' + fieldName).val(urlValue || '');
+                    if (urlValue && urlValue.trim() !== '') {
+                       // console.log('  - Updated hidden field ' + fieldName + ': ' + urlValue);
+                    }
+                });
+
+                // Also populate visible fields if they exist in URL
+                if (urlParams.get('country')) {
+                    $('#country').val(urlParams.get('country')).trigger('change');
+                }
+                if (urlParams.get('productName')) {
+                    $('#productName').val(urlParams.get('productName')).trigger('change');
+                }
+                if (urlParams.get('dateFrom') && urlParams.get('dateTo')) {
+                    var dateFrom = urlParams.get('dateFrom').replace('T00:00:00', '');
+                    var dateTo = urlParams.get('dateTo').replace('T00:00:00', '');
+
+                    function formatDateForDisplay(isoDate) {
+                        var parts = isoDate.split('-');
+                        return parts[2] + '.' + parts[1] + '.' + parts[0];
+                    }
+
+                    var displayDate = formatDateForDisplay(dateFrom) + ' to ' + formatDateForDisplay(dateTo);
+                    $('#dateRange').val(displayDate);
+                }
+            }
+
+            // Populate hidden fields when page loads (in case user came back from filter page)
+            populateHiddenFieldsFromUrl();
+
+        }); // jQuery ready
+    })(); // IIFE wrapper
     </script>
     <?php
 

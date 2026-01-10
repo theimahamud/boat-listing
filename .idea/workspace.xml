@@ -12,13 +12,10 @@
       <change beforePath="$PROJECT_DIR$/../../../.idea/modules.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../../.idea/php.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../../wp-config.php" beforeDir="false" afterPath="$PROJECT_DIR$/../../../wp-config.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/copilotDiffState.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/copilotDiffState.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/boat-listing/boat-details.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-details.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/boat-listing/boat-listing-filters.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-listing-filters.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/boat-listing/boat-listing-helper.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-listing-helper.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/includes/ajax.php" beforeDir="false" afterPath="$PROJECT_DIR$/includes/ajax.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/boat-listing/filter-desired-boat-shortcode.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/filter-desired-boat-shortcode.php" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/public/js/boat-filter-page.js" beforeDir="false" afterPath="$PROJECT_DIR$/public/js/boat-filter-page.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/public/js/boat-listing-public.js" beforeDir="false" afterPath="$PROJECT_DIR$/public/js/boat-listing-public.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,7 +71,7 @@
       <option name="presentableId" value="Default" />
       <updated>1767973943932</updated>
       <workItem from="1767973947693" duration="6292000" />
-      <workItem from="1768014286159" duration="28103000" />
+      <workItem from="1768014286159" duration="30423000" />
     </task>
     <servers />
   </component>

@@ -11,6 +11,99 @@ jQuery(document).ready(function($) {
     var debounceTimer = null;
     var lastRequestParams = null;
 
+    /**
+     * Initialize date range picker with URL parameters
+     */
+    function initializeDateFromUrl() {
+        console.log('🔄 Initializing dates from URL parameters...');
+
+        var urlParams = new URLSearchParams(window.location.search);
+        var dateFrom = urlParams.get('dateFrom');
+        var dateTo = urlParams.get('dateTo');
+
+        if (dateFrom && dateTo) {
+           // console.log('📅 Found date parameters:', dateFrom, 'to', dateTo);
+
+            // Convert ISO format back to display format (DD.MM.YYYY)
+            function formatDateForDisplay(isoDate) {
+                // Remove time part if present (2026-01-11T00:00:00 -> 2026-01-11)
+                var dateOnly = isoDate.replace('T00:00:00', '').split('-');
+                if (dateOnly.length === 3) {
+                    return dateOnly[2] + '.' + dateOnly[1] + '.' + dateOnly[0]; // DD.MM.YYYY
+                }
+                return '';
+            }
+
+            // Convert ISO to JavaScript Date object for Flatpickr
+            function isoToDate(isoString) {
+                var cleanIso = isoString.replace('T00:00:00', '');
+                var parts = cleanIso.split('-');
+                if (parts.length === 3) {
+                    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                }
+                return null;
+            }
+
+            var fromDisplay = formatDateForDisplay(dateFrom);
+            var toDisplay = formatDateForDisplay(dateTo);
+            var fromDate = isoToDate(dateFrom);
+            var toDate = isoToDate(dateTo);
+
+            if (fromDisplay && toDisplay && fromDate && toDate) {
+                var displayDate = fromDisplay + ' to ' + toDisplay;
+                console.log('📅 Setting date range picker to:', displayDate);
+
+                // Set the date range picker value
+                var $dateRange = $('#dateRange');
+                $dateRange.val(displayDate);
+
+                // Also set the hidden fields
+                $('#dateFrom').val(dateFrom);
+                $('#dateTo').val(dateTo);
+
+                // IMPORTANT: Set the Flatpickr instance dates for visual highlighting
+                setTimeout(function() {
+                    if ($dateRange[0] && $dateRange[0]._flatpickr) {
+                        console.log('📅 Setting Flatpickr dates:', fromDate, 'to', toDate);
+                        $dateRange[0]._flatpickr.setDate([fromDate, toDate], false);
+
+                        // Add visual indication that dates are selected with enhanced styling
+                        $dateRange.css({
+                            'border-color': '#27ae60',
+                            'background-color': '#f0fff0',
+                            'box-shadow': '0 0 5px rgba(39, 174, 96, 0.3)'
+                        });
+
+                        console.log('✅ Date range and Flatpickr initialized successfully');
+                    } else {
+                        console.warn('⚠️ Flatpickr instance not found, retrying in 500ms...');
+
+                        // Retry after Flatpickr is initialized
+                        setTimeout(function() {
+                            if ($dateRange[0] && $dateRange[0]._flatpickr) {
+                                console.log('📅 Retry: Setting Flatpickr dates:', fromDate, 'to', toDate);
+                                $dateRange[0]._flatpickr.setDate([fromDate, toDate], false);
+                                $dateRange.css({
+                                    'border-color': '#27ae60',
+                                    'background-color': '#f0fff0',
+                                    'box-shadow': '0 0 5px rgba(39, 174, 96, 0.3)'
+                                });
+                                console.log('✅ Date range initialized on retry');
+                            } else {
+                                console.error('❌ Flatpickr instance still not available');
+                            }
+                        }, 500);
+                    }
+                }, 100); // Small delay to ensure Flatpickr is initialized
+
+                // Trigger change event to ensure any other handlers are notified
+                $dateRange.trigger('change');
+            }
+        } else {
+            console.log('📅 No date parameters found in URL');
+        }
+    }
+
     // Add loading styles
     $('<style>')
         .prop('type', 'text/css')
@@ -51,7 +144,7 @@ jQuery(document).ready(function($) {
      */
     function cancelPendingRequest() {
         if (currentAjaxRequest && currentAjaxRequest.readyState !== 4) {
-            //console('⏹️ Cancelling pending request');
+           //console.log('⏹️ Cancelling pending request');
             currentAjaxRequest.abort();
             currentAjaxRequest = null;
         }
@@ -95,7 +188,7 @@ jQuery(document).ready(function($) {
 
         // Check if this is a duplicate request
         if (source !== 'pagination' && !hasParamsChanged(ajaxData)) {
-            //console('⏭️ Skipping duplicate request');
+           //console.log('⏭️ Skipping duplicate request');
             return;
         }
 
@@ -105,7 +198,7 @@ jQuery(document).ready(function($) {
         if (source === 'filter') {
             cancelPendingRequest();
 
-            //console(`⏳ Debouncing filter request (${DEBOUNCE_DELAY}ms)...`);
+           //console.log(`⏳ Debouncing filter request (${DEBOUNCE_DELAY}ms)...`);
 
             debounceTimer = setTimeout(function() {
                 executeBoatRequest(paged, source, urlParams, ajaxData);
@@ -142,7 +235,7 @@ jQuery(document).ready(function($) {
 
         if (qs.length) ajaxUrl += '?' + qs.join('&');
 
-        //console('📡 Executing boat request - Page:', paged, 'Source:', source);
+       //console.log('📡 Executing boat request - Page:', paged, 'Source:', source);
 
         // Make AJAX request
         currentAjaxRequest = $.ajax({
@@ -157,7 +250,7 @@ jQuery(document).ready(function($) {
                 }
             },
             success: function(res) {
-                //console('✅ Request successful');
+               //console.log('✅ Request successful');
                 requestRetryCount = 0;
                 $('.boat-lists-loader').fadeOut();
 
@@ -186,7 +279,7 @@ jQuery(document).ready(function($) {
                 $('.boat-lists-loader').fadeOut();
 
                 if (status === 'abort') {
-                    //console('⏹️ Request cancelled');
+                   //console.log('⏹️ Request cancelled');
                     return;
                 }
 
@@ -195,7 +288,7 @@ jQuery(document).ready(function($) {
                 // Handle timeout with retry
                 if (status === 'timeout' && requestRetryCount < MAX_RETRIES) {
                     requestRetryCount++;
-                    //console(`🔄 Retry ${requestRetryCount}/${MAX_RETRIES}...`);
+                   //console.log(`🔄 Retry ${requestRetryCount}/${MAX_RETRIES}...`);
 
                     setTimeout(function() {
                         executeBoatRequest(paged, source, urlParams, ajaxData);
@@ -243,18 +336,7 @@ jQuery(document).ready(function($) {
             $('#productName').val(urlParams.get('productName')).trigger('change.select2');
         }
 
-        if (urlParams.get('dateFrom') && urlParams.get('dateTo')) {
-            var dateFrom = urlParams.get('dateFrom').replace('T00:00:00', '');
-            var dateTo = urlParams.get('dateTo').replace('T00:00:00', '');
-
-            function formatDateForDisplay(isoDate) {
-                var parts = isoDate.split('-');
-                return parts[2] + '.' + parts[1] + '.' + parts[0];
-            }
-
-            var displayDate = formatDateForDisplay(dateFrom) + ' to ' + formatDateForDisplay(dateTo);
-            $('#dateRange').val(displayDate);
-        }
+        // Date handling is now done in initializeDateFromUrl() function
 
         // Optional parameters
         ['charterType', 'person', 'cabin', 'year'].forEach(function(param) {
@@ -274,7 +356,7 @@ jQuery(document).ready(function($) {
      * Filter button click handler
      */
     $('#submitFilter').on('click', function() {
-        //console('🔍 Filter button clicked');
+       //console.log('🔍 Filter button clicked');
 
         var currentUrlParams = new URLSearchParams(window.location.search);
         var params = [];
@@ -359,6 +441,71 @@ jQuery(document).ready(function($) {
 
     // Initialize
     populateFiltersFromUrl();
+
+    // Delay date initialization to ensure Flatpickr is loaded
+    setTimeout(function() {
+        initializeDateFromUrl();
+    }, 500);
+
+    // Add visual feedback for date range picker
+    $(document).on('change', '#dateRange', function() {
+        var $this = $(this);
+        var dateValue = $this.val();
+
+        if (dateValue && dateValue.trim()) {
+            console.log('📅 Date range changed to:', dateValue);
+
+            // Enhanced visual styling for selected dates
+            $this.css({
+                'border-color': '#27ae60',
+                'background-color': '#f0fff0',
+                'box-shadow': '0 0 5px rgba(39, 174, 96, 0.3)',
+                'transition': 'all 0.3s ease'
+            });
+
+            // Parse and set hidden fields for API compatibility
+            var parts = [];
+            if (dateValue.indexOf(' to ') !== -1) {
+                parts = dateValue.split(' to ');
+            } else if (dateValue.indexOf(' - ') !== -1) {
+                parts = dateValue.split(' - ');
+            }
+
+            if (parts.length === 2) {
+                // Convert DD.MM.YYYY to YYYY-MM-DDTHH:mm:ss
+                function toApiFormat(dateStr) {
+                    var d = dateStr.trim().split('.');
+                    if (d.length === 3) {
+                        return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
+                    }
+                    return '';
+                }
+
+                var apiFromDate = toApiFormat(parts[0]);
+                var apiToDate = toApiFormat(parts[1]);
+
+                if (apiFromDate && apiToDate) {
+                    $('#dateFrom').val(apiFromDate);
+                    $('#dateTo').val(apiToDate);
+                    console.log('📅 Hidden date fields updated:', apiFromDate, 'to', apiToDate);
+                }
+            }
+        } else {
+            console.log('📅 Date range cleared');
+
+            // Reset to default styling
+            $this.css({
+                'border-color': '#ddd',
+                'background-color': '',
+                'box-shadow': '',
+                'transition': 'all 0.3s ease'
+            });
+
+            // Clear hidden fields
+            $('#dateFrom').val('');
+            $('#dateTo').val('');
+        }
+    });
 
     // Auto-load if URL has parameters
     var urlParams = new URLSearchParams(window.location.search);
