@@ -5,8 +5,21 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="ed920446-7584-45d6-a50a-0b081c0df3eb" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../../../.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../.idea/boat.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../.idea/copilot.data.migration.agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../.idea/copilot.data.migration.ask2agent.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../.idea/modules.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../.idea/php.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../../wp-config.php" beforeDir="false" afterPath="$PROJECT_DIR$/../../../wp-config.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/boat-listing.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/admin/partials/pages/boat-listing.php" beforeDir="false" afterPath="$PROJECT_DIR$/admin/partials/pages/boat-listing.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/boat-listing/boat-details.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-details.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/boat-listing/boat-listing-filters.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-listing-filters.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/boat-listing/boat-listing-helper.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-listing-helper.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/boat-listing/filter-desired-boat-shortcode.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/filter-desired-boat-shortcode.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/includes/class-boat-listing-activator.php" beforeDir="false" afterPath="$PROJECT_DIR$/includes/class-boat-listing-activator.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/public/class-boat-listing-public.php" beforeDir="false" afterPath="$PROJECT_DIR$/public/class-boat-listing-public.php" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/public/js/boat-listing-ajax.js" beforeDir="false" afterPath="$PROJECT_DIR$/public/js/boat-listing-ajax.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/public/js/boat-listing-public.js" beforeDir="false" afterPath="$PROJECT_DIR$/public/js/boat-listing-public.js" afterDir="false" />
     </list>
@@ -63,12 +76,16 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1767973943932</updated>
-      <workItem from="1767973947693" duration="6225000" />
+      <workItem from="1767973947693" duration="6292000" />
+      <workItem from="1768014286159" duration="25701000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="WordPressConfiguration" enabled="true">
+    <wordpressPath>D:\xampp\php-8-2-0\htdocs\boat</wordpressPath>
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

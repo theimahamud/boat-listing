@@ -1,57 +1,34 @@
 <?php
-
     add_shortcode('boat_filter', 'render_boat_listing_filter');
 
-    function render_boat_listing_filter( $atts, $content = null){
+    function render_boat_listing_filter($atts, $content = null){
 
         $helper = new Boat_Listing_Helper();
+        $icon = $helper->icons();
         $charterTypes = $helper->fetch_category();
         $preloader = $helper->bl_render_boat_overlay_preloader();
-        $boat_data = $helper->fetch_all_boats();
-        $icon = $helper->icons();
-        $countries = $helper->fetch_country();
-        $regions = $helper->fetch_regions();
-        $getAvailableYachts = $helper->getAvailableYachts();
+        $getBoatProductTypes = $helper->getBoatProductTypes();
+        $data = $helper->sortPriorityCountries();
+        $getYears = $helper->getBoatYears();
+        $getCabins = $helper->getBoatCabins();
+        $getBoatPersons = $helper->getBoatPersons();
 
-        // Find Caribbean region first
-        $firstRegion = null;
-        $otherRegions = [];
-
-        foreach ($regions as $region) {
-            if (($region['regions_data']['name'] ?? '') === 'Caribbean') {
-                $firstRegion = $region;
-            } else {
-                $otherRegions[] = $region;
-            }
-        }
-
-        // Rebuild regions array with Caribbean first
-        $regionsOrdered = [];
-        if ($firstRegion) {
-            $regionsOrdered[] = $firstRegion;
-        }
-        $regionsOrdered = array_merge($regionsOrdered, $otherRegions);
-
+        $regionsOrdered     = $data['regions'];
+        $remainingCountries = $data['countries'];
 
         ob_start();
 
         ?>
-
             <div class="boat-listing-filter-area" style="position:relative">
-
-                <div class="boat-lists-loader">
-                    <?php echo $preloader; ?>
-                </div>
+                <div class="boat-lists-loader"><?php echo $preloader; ?></div>
 
                 <div class="boat-listing-filter-wraper">
-
                     <div class="filter-bar-area">
                         <div class="filter-bar">
                             <strong><?php echo $icon['filter']; ?> Filter By</strong>
-
                             <div class="filter-fieldset">
-                                <label for="boat_charter_type"><?php echo $icon['charter_type']; ?> Charter Type</label>
-                                <select name="boat_charter_type" id="boat_charter_type" class="boat-listing-select2">
+                                <label for="charterType"><?php echo $icon['charter_type']; ?> Charter Type</label>
+                                <select name="charterType" id="charterType" class="boat-listing-select2">
                                     <option value="">Select Charter Type </option>
                                     <?php foreach ($charterTypes as $category): ?>
                                         <option value="<?php echo esc_attr($category['name']); ?>">
@@ -62,44 +39,19 @@
                             </div>
 
                             <!-- Date filter -->
+                            <!-- Hidden API fields -->
+                            <input type="hidden" name="dateFrom" id="dateFrom">
+                            <input type="hidden" name="dateTo" id="dateTo">
                             <div class="filter-fieldset">
-                                <label for="search_free_yacht"><?php echo $icon['date']; ?> Dates </label>
-                                <input type="text" id="search_free_yacht" name="search_free_yacht" placeholder="Select date range" autocomplete="off" class="boat-listing-input-text bl-date-range-picker" />
+                                <label for="dateRange"><?php echo $icon['date']; ?> Dates </label>
+                                <input type="text" id="dateRange" name="dateRange" placeholder="Select date range" autocomplete="off" class="boat-listing-input-text bl-date-range-picker" />
                             </div>
 
                              <!-- Regions -->
                             <div class="filter-fieldset">
-                                <label for="boat_location">
-                                    <?php echo $icon['location']; ?> Destinations
-                                </label>
-
-                                <select name="boat_location" id="boat_location" class="boat-listing-select2">
+                                <label for="country"><?php echo $icon['location']; ?> Destinations</label>
+                                <select name="country" id="country" class="boat-listing-select2">
                                     <option value="">All Destinations</option>
-
-                                    <?php
-                                    /**
-                                     * Priority destinations
-                                     */
-                                    $priorityNames = [
-                                            // 'British Virgin Islands',
-                                            // 'United States Virgin Islands',
-                                    ];
-
-                                    $priorityCountries = [];
-                                    $remainingCountries = [];
-
-                                    // Separate priority countries from the rest
-                                    foreach ($countries as $country) {
-                                        $countryName = $country['country_data']['name'] ?? '';
-
-                                        if (in_array($countryName, $priorityNames, true)) {
-                                            $priorityCountries[] = $country;
-                                        } else {
-                                            $remainingCountries[] = $country;
-                                        }
-                                    }
-                                    ?>
-
                                     <?php if (!empty($priorityCountries)): ?>
                                         <optgroup label="Popular Destinations">
                                             <?php foreach ($priorityCountries as $country): ?>
@@ -111,9 +63,6 @@
                                     <?php endif; ?>
 
                                     <?php
-                                    /**
-                                     * Render remaining countries by region
-                                     */
                                     foreach ($regionsOrdered as $region):
                                         $regionId   = $region['id'];
                                         $regionName = $region['regions_data']['name'] ?? 'Unknown Region';
@@ -126,7 +75,7 @@
                                             ?>
                                             <optgroup label="<?php echo esc_html($regionName); ?>">
                                                 <?php foreach ($regionCountries as $country): ?>
-                                                    <option value="<?php echo esc_attr($country['id']); ?>">
+                                                    <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>">
                                                         − <?php echo esc_html($country['country_data']['name']); ?>
                                                     </option>
                                                 <?php endforeach; ?>
@@ -139,44 +88,14 @@
                             </div>
 
                             <div class="filter-fieldset">
-                                <label for="boat_category">
-                                    <?php echo $icon['category']; ?> Category
-                                </label>
-
-                                <select name="boat_category" id="boat_category" class="boat-listing-select2">
+                                <label for="productName"><?php echo $icon['category']; ?> Category</label>
+                                <select name="productName" id="productName" class="boat-listing-select2">
                                     <option value="">Select Category</option>
-
                                     <?php
-                                    // Collect unique product names
-                                    $category_list = [];
-
-                                    foreach ($getAvailableYachts as $yacht) {
-                                        $data = json_decode($yacht['data'], true);
-
-                                        if (!empty($data['products']) && is_array($data['products'])) {
-                                            foreach ($data['products'] as $product) {
-                                                if (!empty($product['name'])) {
-                                                    $category_list[] = trim($product['name']);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // Make unique & sort
-                                    $category_list = array_unique($category_list);
-                                    sort($category_list, SORT_STRING);
-
-                                    function formatCategoryName($string) {
-                                        // Add space before capital letters
-                                        $string = preg_replace('/(?<!^)([A-Z])/', ' $1', $string);
-                                        return trim($string);
-                                    }
-
-                                    foreach ($category_list as $category):
-                                        $formatted = formatCategoryName($category);
+                                    foreach ($getBoatProductTypes as $productType):
                                         ?>
-                                        <option value="<?php echo esc_attr($category); ?>">
-                                            <?php echo esc_html($formatted); ?>
+                                        <option value="<?php echo esc_attr($productType); ?>">
+                                            <?php echo esc_html($productType); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
@@ -184,24 +103,10 @@
 
                             <!--Person filter -->
                             <div class="filter-fieldset">
-                                <label for="boat_person"><?php echo $icon['person']; ?> Person</label>
-                                <select name="boat_person" id="boat_person" class="boat-listing-select2">
+                                <label for="people"><?php echo $icon['person']; ?> Person</label>
+                                <select name="people" id="people" class="boat-listing-select2">
                                     <option value="">Select Person</option>
-                                    <?php
-                                    $person_list = [];
-
-                                    foreach ($getAvailableYachts as $yacht) {
-                                        $p_data = json_decode($yacht['data'], true);
-
-                                        if (!empty($p_data['maxPeopleOnBoard']) && (int)$p_data['maxPeopleOnBoard'] > 0) {
-                                            $person_list[] = (int)$p_data['maxPeopleOnBoard'];
-                                        }
-                                    }
-
-                                    $person_list = array_unique($person_list);
-                                    sort($person_list, SORT_NUMERIC);
-
-                                    foreach ($person_list as $person):
+                                    <?php foreach ($getBoatPersons as $person):
                                         ?>
                                         <option value="<?php echo esc_attr($person); ?>">
                                             <?php echo esc_html($person); ?>
@@ -211,28 +116,10 @@
                             </div>
 
                             <div class="filter-fieldset">
-                                <label for="boat_cabin"><?php echo $icon['cabin']; ?> Cabin</label>
-                                <select name="boat_cabin" id="boat_cabin" class="boat-listing-select2">
+                                <label for="cabin"><?php echo $icon['cabin']; ?> Cabin</label>
+                                <select name="cabin" id="cabin" class="boat-listing-select2">
                                     <option value="">Select Cabin</option>
-                                    <?php 
-
-                                    // Extract and sort cabins - order -> 1,2,3,4
-                                    $cabins_list = [];
-
-                                    foreach ($getAvailableYachts as $cabins) {
-
-                                        $c_data = json_decode($cabins['data'], true);
-
-                                        // Safety check
-                                        if (isset($c_data['cabins']) && $c_data['cabins'] > 0) {
-                                            $cabins_list[] = (int) $c_data['cabins'];
-                                        }
-                                    }
-
-                                    $cabins_list = array_unique($cabins_list);
-                                    sort($cabins_list, SORT_NUMERIC);
-                                    
-                                    foreach( $cabins_list as $cabin): ?>
+                                    <?php foreach( $getCabins as $cabin): ?>
 
                                     <option value="<?php echo $cabin; ?>"><?php echo $cabin; ?></option>
 
@@ -241,32 +128,10 @@
                             </div>
 
                             <div class="filter-fieldset">
-                                <label for="boat_year"><?php echo $icon['date']; ?> Build Year</label>
-                                <select name="boat_year" id="boat_year" class="boat-listing-select2">
+                                <label for="year"><?php echo $icon['date']; ?> Build Year</label>
+                                <select name="year" id="year" class="boat-listing-select2">
                                     <option value="">Select Year</option>
-
-                                    <?php
-                                    $year_list = [];
-
-                                    foreach ($boat_data as $boat) {
-
-                                        // data যদি string হয় → decode
-                                        if (is_string($boat['data'])) {
-                                            $data = json_decode($boat['data'], true);
-                                        } else {
-                                            // data already array
-                                            $data = $boat['data'];
-                                        }
-
-                                        if (!empty($data['year'])) {
-                                            $year_list[] = (int) $data['year'];
-                                        }
-                                    }
-
-                                    $year_list = array_unique($year_list);
-                                    rsort($year_list, SORT_NUMERIC);
-
-                                    foreach ($year_list as $year):
+                                    <?php foreach ($getYears as $year):
                                         ?>
                                         <option value="<?php echo esc_attr($year); ?>">
                                             <?php echo esc_html($year); ?>
@@ -274,6 +139,7 @@
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <button id="submitFilter" type="button">Filter</button>
                         </div>
                         <div class="contact-info">
                             <h5 class="title"><?php echo $icon['headphone']; ?>Help Center</h5>
@@ -298,11 +164,6 @@
                                 <!-- get boat pagination from ajax -->
                             </div>
                         </div>
-
-                        <div class="filter-summary-wrap" style="display: none;">
-                            <div class="filtered-lists"></div>
-                            <button id="reset-filters" class="reset-button">Reset Filter</button>
-                        </div>
                         
                         <div class="boat-lists">
                             <!-- get boat list from ajax -->
@@ -320,45 +181,70 @@
         $content = ob_get_clean();
 
         return $content;
-
     }
-// End Filter ======================================================
 
+// End Filter ======================================================
     add_action('wp_ajax_bl_get_paginated_boats', 'bl_get_paginated_boats');
     add_action('wp_ajax_nopriv_bl_get_paginated_boats', 'bl_get_paginated_boats');
 
     function bl_get_paginated_boats() {
 
-        // Increase timeout for slow price API
-        set_time_limit(180); // 3 minutes
-        ini_set('max_execution_time', 180);
-
-        // Track timing for debugging
-        $start_time = microtime(true);
-
         $helper = new Boat_Listing_Helper();
-        
 
         $paged = isset($_POST['paged']) ? max(1, intval($_POST['paged'])) : 1;
         $per_page = 10;
 
         $filters = [
-            'charter_type'  => sanitize_text_field($_POST['charter_type'] ?? ''),
+            'charter_type'  => sanitize_text_field($_POST['charter_type'] ?? $_GET['charterType'] ?? ''),
             'model'  => sanitize_text_field($_POST['model'] ?? ''),
             'company'  => sanitize_text_field($_POST['company'] ?? ''),
             'location' => sanitize_text_field($_POST['location'] ?? ''),
-            'cabin'    => intval($_POST['cabin'] ?? 0),
-            'person'    => intval($_POST['person'] ?? 0),
-            'year'     => sanitize_text_field($_POST['year'] ?? ''),
+            'cabin'    => intval($_POST['cabin'] ?? $_GET['cabin'] ?? 0),
+            'person'    => intval($_POST['person'] ?? $_GET['person'] ?? 0),
+            'year'     => sanitize_text_field($_POST['year'] ?? $_GET['year'] ?? ''),
             'free_yacht'     => sanitize_text_field($_POST['free_yacht'] ?? ''),
             'category'     => sanitize_text_field($_POST['category'] ?? ''),
+
+            // Additional advanced filter parameters
+            'berths'    => intval($_GET['berths'] ?? 0),
+            'wc'        => intval($_GET['wc'] ?? 0),
+            'min_length' => floatval($_GET['minLength'] ?? 0),
+            'max_length' => floatval($_GET['maxLength'] ?? 0),
+            'company_id' => intval($_GET['companyId'] ?? 0),
+            'base_from_id' => intval($_GET['baseFromId'] ?? 0),
+            'base_to_id' => intval($_GET['baseToId'] ?? 0),
+            'sailing_area_id' => intval($_GET['sailingAreaId'] ?? 0),
+            'model_id' => intval($_GET['modelId'] ?? 0),
+            'flexibility' => intval($_GET['flexibility'] ?? 1),
         ];
 
-        $datas = $helper->boat_filters($paged, $per_page, $filters);
+        // Debug filters
+        error_log("🔍 AJAX Filters received (total: " . count(array_filter($filters)) . "):");
+        foreach($filters as $key => $value) {
+            if (!empty($value)) {
+                error_log("  - {$key}: {$value}");
+            }
+        }
 
-//        echo "<pre>";
-//        print_r($datas);
-//        die;
+        $country = isset($_GET['country']) && $_GET['country'] ? $_GET['country'] : '';
+        $productName = isset($_GET['productName']) && $_GET['productName'] ? sanitize_text_field($_GET['productName']) : '';
+        $dateFrom = isset($_GET['dateFrom']) && $_GET['dateFrom'] ? $_GET['dateFrom'] : '';
+        $dateTo = isset($_GET['dateTo']) && $_GET['dateTo'] ? $_GET['dateTo'] : '';
+
+        // Debug URL parameters
+        error_log("🔍 URL Parameters:");
+        error_log("  - country: " . $country);
+        error_log("  - productName: " . $productName);
+        if (!empty($_GET['charterType'])) error_log("  - charterType: " . $_GET['charterType']);
+        if (!empty($_GET['person'])) error_log("  - person: " . $_GET['person']);
+        if (!empty($_GET['cabin'])) error_log("  - cabin: " . $_GET['cabin']);
+        if (!empty($_GET['year'])) error_log("  - year: " . $_GET['year']);
+        if (!empty($_GET['berths'])) error_log("  - berths: " . $_GET['berths']);
+        if (!empty($_GET['companyId'])) error_log("  - companyId: " . $_GET['companyId']);
+
+        $icon = $helper->icons();
+
+        $datas = $helper->boat_filters($country, $productName, $dateFrom, $dateTo, $paged, $per_page, $filters);
 
         ob_start();
 
@@ -386,15 +272,53 @@
                     }
                 }
 
-                // Build details URL with date parameters if available
-                $url_params = 'id=' . urlencode($data['id'] ?? '');
+                // Build details URL with ALL current filter parameters for proper back navigation
+                $url_params = 'yachtId=' . urlencode($data['id'] ?? '');
+
+                // Add date parameters if available (ensure ISO time format)
                 if ($date_from && $date_to) {
-                    $url_params .= '&dateFrom=' . urlencode($date_from) . '&dateTo=' . urlencode($date_to);
+                    // Ensure dates have proper ISO time format for API compatibility
+                    $formatted_date_from = $date_from;
+                    $formatted_date_to = $date_to;
+
+                    // Add time component if missing
+                    if (!empty($formatted_date_from) && strpos($formatted_date_from, 'T') === false) {
+                        $formatted_date_from .= 'T00:00:00';
+                    }
+                    if (!empty($formatted_date_to) && strpos($formatted_date_to, 'T') === false) {
+                        $formatted_date_to .= 'T00:00:00';
+                    }
+
+                    $url_params .= '&dateFrom=' . urlencode($formatted_date_from) . '&dateTo=' . urlencode($formatted_date_to);
                 }
+
+                // Include all current filter parameters so user can return to exact filter state
+                $current_filters = [
+                    'country' => $country,
+                    'productName' => $productName,
+                    'charterType' => $_GET['charterType'] ?? '',
+                    'person' => $_GET['person'] ?? '',
+                    'cabin' => $_GET['cabin'] ?? '',
+                    'year' => $_GET['year'] ?? '',
+                    'berths' => $_GET['berths'] ?? '',
+                    'wc' => $_GET['wc'] ?? '',
+                    'minLength' => $_GET['minLength'] ?? '',
+                    'maxLength' => $_GET['maxLength'] ?? '',
+                    'companyId' => $_GET['companyId'] ?? '',
+                    'baseFromId' => $_GET['baseFromId'] ?? '',
+                    'baseToId' => $_GET['baseToId'] ?? '',
+                    'sailingAreaId' => $_GET['sailingAreaId'] ?? '',
+                    'modelId' => $_GET['modelId'] ?? '',
+                    'flexibility' => $_GET['flexibility'] ?? '1'
+                ];
+
+                foreach ($current_filters as $param => $value) {
+                    if ($value !== '') {
+                        $url_params .= '&' . $param . '=' . urlencode($value);
+                    }
+                }
+
                 $single_url = esc_url(site_url('/boat-details/?' . $url_params));
-
-                $icon = $helper->icons();
-
                 ?>
                 <div class="boat-list">
                     <div class="boat-img">
@@ -454,43 +378,20 @@
 
                         <div class="price-info-wrap">
                             <?php
-                            // Calculate number of days in date range (reuse parsed dates from above)
-                            $days_count = 0;
-                            if ($date_from && $date_to) {
-                                $days_count = round((strtotime($date_to) - strtotime($date_from)) / (60 * 60 * 24));
-                            }
-
-                            // Check if price data is already available from price-first approach
-                            if (!empty($data['price_info'])) {
-                                $min = $data['price_info']['min'] ?? 0;
-                                $max = $data['price_info']['max'] ?? 0;
+                            // Show offer price if available from API
+                            if (!empty($data['offer']['price'])) {
+                                $price = number_format($data['offer']['startPrice'], 0);
+//                                $currency = $data['offer']['currency'] ?? 'EUR';
+                                $currency = '€';
 
                                 echo '<div class="price-info">';
-                                //echo $icon['euro'];
-                                echo '<div style="display: flex; flex-direction: column; gap: 2px;">';
-
-                                if ($min == $max) {
-                                    echo '<span>' . number_format($min, 0) . ' ' . esc_html('€') . '</span>';
-                                } else {
-                                    echo '<span>' . number_format($min, 0) . ' - ' . number_format($max, 0) . ' ' . esc_html('€') . '</span>';
-                                }
-
-                                // Show "Price for X days"
-                                if ($days_count > 0) {
-                                    echo '<span style="font-size: 12px; color: #666;">Price for ' . $days_count . ' day' . ($days_count > 1 ? 's' : '') . '</span>';
-                                }
-
-                                echo '</div>';
-                                echo '</div>';
-                            } elseif ($has_date_filter) {
-                                // Date filter applied but no price data (shouldn't happen with price-first)
-                                echo '<div class="price-info">';
-                                echo $icon['euro'];
-                                echo '<span class="bl-spinner"></span>';
+                                echo '<p><i class="ri-money-euro-circle-line" style="margin-right:4px;"></i>';
+                                echo 'Price: ' . $price . ' ' . esc_html($currency) . '</p>';
                                 echo '</div>';
                             } else {
-                                echo '<div class="price-info price-info--hint">';
-                                echo '<p>📅 Select dates to see prices</p>';
+                                echo '<div class="price-info">';
+                                echo '<p><i class="ri-money-euro-circle-line" style="margin-right:4px;"></i>';
+                                echo 'Price: N/A</p>';
                                 echo '</div>';
                             }
                             ?>
@@ -511,9 +412,10 @@
                 </div>
             <?php endforeach;
         else:
-            echo '<p>No Yacht found.</p>';
+            $message = isset($datas['message']) ? $datas['message'] : 'No boats found for your search criteria.';
+            echo '<div class="no-boats-found" style="text-align:center; padding:40px;">';
+            echo '<h3>🚫 ' . $message . '</h3>';
         endif;
-
     
         // This shortcode for booking modal
         echo do_shortcode('[book_now_modal_shortcode]');
@@ -523,94 +425,56 @@
         // Pagination HTML
         ob_start();
 
-        if ($datas['pages'] > 1) {
-            echo '<div class="pagination">';
+        error_log("🔍 Pagination Debug:");
+        error_log("  - Total pages: " . $datas['pages']);
+        error_log("  - Current page: " . $datas['paged']);
+        error_log("  - Total boats: " . $datas['total']);
 
+        if ($datas['pages'] > 1) {
             $current = $datas['paged'];
             $total_pages = $datas['pages'];
-            $jump_interval = 20;
-            $max_jumps_to_show = 2; // Show max 3 jump intervals on each side
 
-            // Prev button
+            error_log("  ✅ Generating pagination HTML");
+            error_log("  - Current page: " . $current);
+            error_log("  - Total pages: " . $total_pages);
+
+            echo '<div class="pagination">';
+
+
+            // Previous button
             if ($current > 1) {
                 echo '<a href="#" class="bl-page" data-page="' . ($current - 1) . '">' . $icon["arrowleft"] . '</a>';
             }
 
-            // Always show first page
-            echo '<a href="#" class="bl-page ' . ($current == 1 ? 'active' : '') . '" data-page="1">1</a>';
+            // Simple pagination logic
+            $start_page = max(1, $current - 2);
+            $end_page = min($total_pages, $current + 2);
 
-            // Show pages 2-3 if we're on early pages
-            if ($current <= 4) {
-                if ($total_pages >= 2) {
-                    echo '<a href="#" class="bl-page ' . ($current == 2 ? 'active' : '') . '" data-page="2">2</a>';
-                }
-                if ($total_pages >= 3) {
-                    echo '<a href="#" class="bl-page ' . ($current == 3 ? 'active' : '') . '" data-page="3">3</a>';
-                }
-            }
+            error_log("  - Start page: " . $start_page);
+            error_log("  - End page: " . $end_page);
 
-            // Collect all jump intervals
-            $jump_pages = [];
-            for ($j = $jump_interval; $j < $total_pages; $j += $jump_interval) {
-                $jump_pages[] = $j;
-            }
-
-            // Find jumps before and after current
-            $jumps_before = [];
-            $jumps_after = [];
-            
-            foreach ($jump_pages as $jump) {
-                if ($jump < $current - 2) {
-                    $jumps_before[] = $jump;
-                } elseif ($jump > $current + 2) {
-                    $jumps_after[] = $jump;
+            // Show dots before if needed
+            if ($start_page > 1) {
+                echo '<a href="#" class="bl-page" data-page="1">1</a>';
+                if ($start_page > 2) {
+                    echo '<span class="dots">...</span>';
                 }
             }
 
-            // Show limited jump intervals BEFORE current (last N jumps before current)
-            $jumps_before = array_slice($jumps_before, -$max_jumps_to_show);
-            foreach ($jumps_before as $jump) {
-                if ($jump > 3) { // Don't show if too close to page 1
-                    echo '<span class="dots">..</span>';
-                    echo '<a href="#" class="bl-page" data-page="' . $jump . '">' . $jump . '</a>';
+            // Show page numbers
+            for ($i = $start_page; $i <= $end_page; $i++) {
+                $active_class = ($i == $current) ? ' active' : '';
+                echo '<a href="#" class="bl-page' . $active_class . '" data-page="' . $i . '">' . $i . '</a>';
+                error_log("  - Generated page: " . $i . ($i == $current ? ' (active)' : ''));
+            }
+
+            // Show dots after if needed
+            if ($end_page < $total_pages) {
+                if ($end_page < $total_pages - 1) {
+                    echo '<span class="dots">...</span>';
                 }
-            }
-
-            // Show ellipsis before current group if needed
-            if ($current > 3 && (empty($jumps_before) || max($jumps_before) < $current - 2)) {
-                echo '<span class="dots">..</span>';
-            }
-
-            // Pages around current page (current-1, current, current+1)
-            if ($current > 3) {
-                $start = max(2, $current - 1);
-                $end = min($total_pages - 1, $current + 1);
-                
-                for ($i = $start; $i <= $end; $i++) {
-                    echo '<a href="#" class="bl-page ' . ($i == $current ? 'active' : '') . '" data-page="' . $i . '">' . $i . '</a>';
-                }
-            }
-
-            // Show limited jump intervals AFTER current (first N jumps after current)
-            $jumps_after = array_slice($jumps_after, 0, $max_jumps_to_show);
-            foreach ($jumps_after as $jump) {
-                echo '<span class="dots">..</span>';
-                echo '<a href="#" class="bl-page" data-page="' . $jump . '">' . $jump . '</a>';
-            }
-
-            // Ellipsis before last page
-            if (!empty($jumps_after)) {
-                $last_jump = end($jumps_after);
-                if ($last_jump < $total_pages - 1) {
-                    echo '<span class="dots">..</span>';
-                }
-            } elseif ($current < $total_pages - 3) {
-                echo '<span class="dots">..</span>';
-            }
-
-            // Always show last page
-            if ($total_pages > 1) {
-                echo '<a href="#" class="bl-page ' . ($current == $total_pages ? 'active' : '') . '" data-page="' . $total_pages . '">' . $total_pages . '</a>';
+                echo '<a href="#" class="bl-page" data-page="' . $total_pages . '">' . $total_pages . '</a>';
+                error_log("  - Generated last page: " . $total_pages);
             }
 
             // Next button
@@ -619,12 +483,11 @@
             }
 
             echo '</div>';
+        } else {
+            error_log("  ❌ No pagination generated - pages: " . $datas['pages']);
         }
 
          $pagination_html = ob_get_clean();
-
-        // Calculate total execution time
-        $total_time = microtime(true) - $start_time;
 
         // Clean any output that might have leaked
         if (ob_get_level()) {
@@ -636,11 +499,8 @@
             'pagination_html' => $pagination_html,
             'total_boats' => $datas['total'],
             'has_date_filter' => !empty($filters['free_yacht']),
-            'has_prices' => !empty($datas['has_prices']), // NEW: Indicate prices already fetched
-            'date_range' => $filters['free_yacht'] ?? '',
-            'timing' => [
-                'total_time' => round($total_time, 2) . 's'
-            ]
+            'has_prices' => !empty($datas['has_prices']),
+            'date_range' => $filters['free_yacht'] ?? ''
         ]);
 
         wp_die(); // Ensure clean exit
@@ -715,3 +575,45 @@
 
         wp_die();
     }
+
+// Admin API Test Page
+add_action('admin_menu', function() {
+    add_submenu_page(
+        'tools.php',
+        'Boat API Test',
+        'Boat API Test',
+        'manage_options',
+        'boat-api-test',
+        'boat_api_test_page'
+    );
+});
+
+function boat_api_test_page() {
+    if (isset($_POST['run_test'])) {
+        $helper = new Boat_Listing_Helper();
+        $results = $helper->test_api();
+        echo '<div class="notice notice-success"><p>✅ API Test completed! Check error logs for results.</p></div>';
+    }
+
+    ?>
+    <div class="wrap">
+        <h1>🧪 Boat API Test</h1>
+        <p>This will test the Booking Manager API with different parameters.</p>
+        <form method="post">
+            <input type="hidden" name="run_test" value="1">
+            <p class="submit">
+                <input type="submit" class="button-primary" value="🚀 Run API Test">
+            </p>
+        </form>
+
+        <h2>Quick Test URLs:</h2>
+        <ul>
+            <li><a href="/boat/boat-filter?country=GR&productName=Bareboat" target="_blank">🇬🇷 Greece + Bareboat</a></li>
+            <li><a href="/boat/boat-filter?country=HR&productName=Bareboat" target="_blank">🇭🇷 Croatia + Bareboat</a></li>
+            <li><a href="/boat/boat-filter?country=TR&productName=Bareboat" target="_blank">🇹🇷 Turkey + Bareboat</a></li>
+            <li><a href="/boat/boat-filter?country=GR" target="_blank">🇬🇷 Greece Only</a></li>
+        </ul>
+    </div>
+    <?php
+}
+

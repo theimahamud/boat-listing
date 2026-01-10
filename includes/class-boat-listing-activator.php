@@ -795,44 +795,36 @@ class Boat_Listing_Activator {
 
         $current_year = date('Y');
 
-        for ($i = 0; $i <= 1; $i++) {
+        $year = $current_year + $i;
 
-            $year = $current_year + $i;
+        // API URL with only year
+        $url = "https://www.booking-manager.com/api/v2/shortAvailability/{$current_year}?format=1";
 
-            // API URL with only year
-            $url = "https://www.booking-manager.com/api/v2/shortAvailability/{$year}?format=1";
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => [
+                "accept: application/json",
+                "Authorization: Bearer " . self::cread(),
+            ],
+            CURLOPT_TIMEOUT => 60,
+        ]);
 
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_HTTPHEADER => [
-                    "accept: application/json",
-                    "Authorization: Bearer " . self::cread(),
-                ],
-                CURLOPT_TIMEOUT => 60,
-            ]);
+        $response = curl_exec($ch);
+        curl_close($ch);
 
-            $response = curl_exec($ch);
-            curl_close($ch);
+        $rows = json_decode($response, true);
 
-            $rows = json_decode($response, true);
-
-            if (!$rows) {
-                error_log("❌ No yachts data received from API for year {$year}");
-                continue;
-            }
-
-            foreach ($rows as $row) {
-                $wpdb->replace(
-                    "{$wpdb->prefix}yacht_availability",
-                    [
-                        'yacht_id'            => (int) $row['y'],
-                        'year'                => $year,
-                        'availability_string' => $row['bs'],
-                        'updated_at'          => current_time('mysql'),
-                    ]
-                );
-            }
+        foreach ($rows as $row) {
+            $wpdb->replace(
+                "{$wpdb->prefix}yacht_availability",
+                [
+                    'yacht_id'            => (int) $row['y'],
+                    'year'                => $year,
+                    'availability_string' => $row['bs'],
+                    'updated_at'          => current_time('mysql'),
+                ]
+            );
         }
 
         delete_transient('bl_availability_lock');

@@ -5,21 +5,103 @@ add_shortcode('boat_details', 'render_single_boat_by_query');
 function render_single_boat_by_query() {
     $helper = new Boat_Listing_Helper();
 
-    $boat_id = (string) sanitize_text_field($_GET['id']);
-
     $current_year = date('Y');
-    $date_from = sanitize_text_field($_GET['dateFrom'] ?? $current_year . '-01-01'); // Jan 1 current year
-    $date_to   = sanitize_text_field($_GET['dateTo'] ?? $current_year . '-12-31');   // Dec 31 current year
+    $boat_id = sanitize_text_field($_GET['yachtId'] ?? '');
+    $country = sanitize_text_field($_GET['country'] ?? '');
+    $dateFrom = sanitize_text_field($_GET['dateFrom'] ?? '');
+    $dateTo = sanitize_text_field($_GET['dateTo'] ?? '');
+    $productName = sanitize_text_field($_GET['productName'] ?? '');
+    $charterType = sanitize_text_field($_GET['charterType'] ?? '');
+    $cabin = sanitize_text_field($_GET['cabin'] ?? '');
+    $year = sanitize_text_field($_GET['year'] ?? '');
+    $person = sanitize_text_field($_GET['person'] ?? '');
+    $berths = sanitize_text_field($_GET['berths'] ?? '');
+    $wc = sanitize_text_field($_GET['wc'] ?? '');
+    $minLength = sanitize_text_field($_GET['minLength'] ?? '');
+    $maxLength = sanitize_text_field($_GET['maxLength'] ?? '');
+    $companyId = sanitize_text_field($_GET['companyId'] ?? '');
+    $baseFromId = sanitize_text_field($_GET['baseFromId'] ?? '');
+    $baseToId = sanitize_text_field($_GET['baseToId'] ?? '');
+    $sailingAreaId = sanitize_text_field($_GET['sailingAreaId'] ?? '');
+    $modelId = sanitize_text_field($_GET['modelId'] ?? '');
+    $flexibility = sanitize_text_field($_GET['flexibility'] ?? '');
 
-    $boat_data = $helper->fetch_all_boats( $boat_id );
+    $default_date_from = $current_year . '-01-01T00:00:00'; // Jan 1 current year with time
+    $default_date_to = $current_year . '-12-31T00:00:00';   // Dec 31 current year with time
 
-    $prices = $helper->get_single_yacht_price_details($boat_id, $date_from, $date_to);
+    $date_from = sanitize_text_field($_GET['dateFrom'] ?? $default_date_from);
+    $date_to   = sanitize_text_field($_GET['dateTo'] ?? $default_date_to);
+
+    // Ensure dates have proper ISO time format if they don't already
+    if (!empty($date_from) && strpos($date_from, 'T') === false) {
+        $date_from .= 'T00:00:00';
+    }
+    if (!empty($date_to) && strpos($date_to, 'T') === false) {
+        $date_to .= 'T00:00:00';
+    }
+
+    // Prepare all filters for API call including the specific yachtId
+    $all_filters = [
+        'country' => $country,
+        'productName' => $productName,
+        'charterType' => $charterType,
+        'person' => $person,
+        'cabin' => $cabin,
+        'year' => $year,
+        'berths' => $berths,
+        'wc' => $wc,
+        'minLength' => $minLength,
+        'maxLength' => $maxLength,
+        'companyId' => $companyId,
+        'baseFromId' => $baseFromId,
+        'baseToId' => $baseToId,
+        'sailingAreaId' => $sailingAreaId,
+        'modelId' => $modelId,
+        'flexibility' => $flexibility,
+        'yachtId' => [$boat_id], // Specific yacht ID for single offer
+    ];
+
+    // Remove empty values but keep meaningful zeros and arrays
+    $filters_for_api = array_filter($all_filters, function($value) {
+        return $value !== '' && $value !== null && (!is_array($value) || !empty($value));
+    });
+
+    $prices = $helper->get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters_for_api);
 
     if (empty($boat_id)) {
         return '<p>No boat ID provided.</p>';
     }
 
-    foreach( $boat_data as $data);
+    $boat_data = $helper->fetch_all_boats($boat_id);
+
+    if (empty($boat_data)) {
+        return '<p>Boat not found.</p>';
+    }
+
+    // Extract boat data from the result
+    $data = $boat_data['data'] ?? [];
+
+    if (empty($data)) {
+        return '<p>Invalid boat data.</p>';
+    }
+
+    // Build back to results URL with all current filter parameters
+    $back_params = [];
+
+    $filter_params = [
+        'country', 'productName', 'charterType', 'person', 'cabin', 'year',
+        'berths', 'wc', 'minLength', 'maxLength', 'companyId', 'baseFromId',
+        'baseToId', 'sailingAreaId', 'modelId', 'flexibility', 'dateFrom', 'dateTo'
+    ];
+
+    foreach ($filter_params as $param) {
+        if (!empty($_GET[$param])) {
+            $back_params[] = $param . '=' . urlencode($_GET[$param]);
+        }
+    }
+
+    $back_url = site_url('/boat-filter' . (!empty($back_params) ? '?' . implode('&', $back_params) : ''));
+    $show_back_button = !empty($back_params); // Only show if we have filters to go back to
 
     ob_start();
     ?>
@@ -72,7 +154,7 @@ function render_single_boat_by_query() {
                     <li>
                         <span><?php _e('Price:', 'boat-listing'); ?></span>
                         <?php
-                        if ($prices) {
+                        if ($prices && $prices['min'] !== 'N/A' && $prices['max'] !== 'N/A') {
                             echo esc_html($prices['min'] . ' to ' . $prices['max'] . ' ' . $prices['currency']);
                         } else {
                             echo 'N/A';
@@ -243,7 +325,7 @@ function render_single_boat_by_query() {
                                 <td>
                                     <?php echo esc_html(date('Y-m-d', strtotime($row['dateTo']))); ?>
                                 </td>
-                                <td><?php echo esc_html($row['price']); ?></td>
+                                <td><?php echo esc_html(number_format($row['totalPrice'] ?? $row['price'], 2)); ?></td>
                                 <td><?php echo esc_html($row['currency']); ?></td>
                             </tr>
                         <?php endforeach; ?>
@@ -253,7 +335,6 @@ function render_single_boat_by_query() {
                 <?php endif; ?>
             </div>
         </div>
-
     </div>
 
     <!-- <div class="boat-listing-tab">
@@ -487,6 +568,60 @@ function render_single_boat_by_query() {
 
     // This shortcode for booking modal
     echo do_shortcode('[book_now_modal_shortcode]');
+    ?>
+
+    <?php if ($show_back_button): ?>
+    <!-- Enhanced navigation JavaScript for details page -->
+    <script>
+    jQuery(document).ready(function($) {
+
+        // Handle browser back button to go to filter page if came from there
+        var referrer = document.referrer;
+        if (referrer && referrer.includes('/boat-filter')) {
+            // User came from filter page - enhance back button behavior
+            console.log('🔍 User came from filter page, enhancing navigation');
+
+            // Handle browser back button
+            window.addEventListener('popstate', function(event) {
+                if (referrer.includes('/boat-filter')) {
+                    window.location.href = '<?php echo esc_js($back_url); ?>';
+                }
+            });
+
+            // Add keyboard shortcut (Escape key) for quick back navigation
+            $(document).keydown(function(e) {
+                if (e.keyCode === 27) { // Escape key
+                    window.location.href = '<?php echo esc_js($back_url); ?>';
+                }
+            });
+
+            // Add visual feedback for back button
+            $('.back-to-results a').on('click', function() {
+                $(this).css('opacity', '0.7');
+                console.log('🔙 Navigating back to search results with filters preserved');
+            });
+        }
+
+        // Log filter parameters being preserved for debugging
+        var urlParams = new URLSearchParams(window.location.search);
+        var filterParams = [];
+        var preservedParams = ['country', 'productName', 'charterType', 'person', 'cabin', 'year', 'dateFrom', 'dateTo'];
+
+        preservedParams.forEach(function(param) {
+            if (urlParams.get(param)) {
+                filterParams.push(param + '=' + urlParams.get(param));
+            }
+        });
+
+        if (filterParams.length > 0) {
+            console.log('🔗 Details page loaded with filter parameters:', filterParams.join('&'));
+        }
+
+    });
+    </script>
+    <?php endif; ?>
+
+    <?php
 
     return ob_get_clean();
 }

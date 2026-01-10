@@ -98,124 +98,6 @@
 				scrollTop: $tabs.offset().top
 			}, 500);
 		});
-	
-
-		// Start display filter data
-		const filterSelectors = [
-			'#boat_charter_type',
-			'#boat_model',
-			'#boat_company',
-			'#boat_location',
-			'#boat_cabin',
-			'#boat_person',
-			'#boat_year',
-			'#search_free_yacht',
-			'#boat_category',
-		];
-
-		function getFilterLabel(id) {
-			return $(`label[for="${id}"]`).text().trim();
-		}
-
-		function renderActiveFilters() {
-
-			const $filteredLists = $('.filtered-lists');
-			$filteredLists.empty();
-
-			let hasFilters = false;
-
-			filterSelectors.forEach(selector => {
-				const $field = $(selector);
-				const value = $field.val();
-				const id = $field.attr('id');
-
-				if (value && value !== "") {
-					hasFilters = true;
-					const label = getFilterLabel(id);
-
-					let text = value; // default for inputs
-					if ($field.is('select')) {
-						text = $field.find('option:selected').text();
-					}
-
-					const filterItem = `
-						<div class="active-filter" data-id="${id}">
-							<strong>${label}: </strong> ${text}
-							<span class="remove-filter" title="Remove">×</span>
-						</div>
-					`;
-					$filteredLists.append(filterItem);
-				}
-			});
-
-			$('.filter-summary-wrap').toggle(hasFilters);
-		}
-
-
-		// On change, re-render active filters
-		$('.filter-bar select, .filter-bar input').on('change, input', function() {
-			renderActiveFilters();
-			// Optionally: Trigger Ajax filter call here
-		});
-
-		// Remove single filter
-		$(document).on('click', '.remove-filter', function () {
-			const fieldId = $(this).parent().data('id');
-			const $field = $(`#${fieldId}`);
-
-			// Clear the field value
-			$field.val('');
-
-			// Handle select dropdowns
-			if ($field.is('select')) {
-				$field.prop('selectedIndex', 0).trigger('change');
-			}
-			// Handle input fields (text, number, date, etc.)
-			else if ($field.is('input')) {
-				$field.trigger('input').trigger('change');
-			}
-			// Optional: for checkboxes or radio buttons
-			else if ($field.is(':checkbox') || $field.is(':radio')) {
-				$field.prop('checked', false).trigger('change');
-			}
-
-			// Re-render active filters UI
-			renderActiveFilters();
-		});
-
-	// Reset all filters
-	$('#reset-filters').on('click', function() {
-		// 🎯 Better reset: handle Select2 properly without triggering change events yet
-		filterSelectors.forEach(selector => {
-			// Don't clear date picker - it will be reset to default below
-			if (selector !== '#search_free_yacht') {
-				var $el = $(selector);
-
-				// For Select2 dropdowns, use .val(null) to clear properly
-				if ($el.hasClass('boat-listing-select2') && $el.is('select')) {
-					$el.val(null).trigger('change.select2'); // Update Select2 UI only
-				} else if ($el.is('select')) {
-					$el.prop('selectedIndex', 0);
-				} else {
-					$el.val('');
-				}
-			}
-		});
-
-		renderActiveFilters();
-
-		// ✅ Trigger boat reload after Select2 has time to update its UI
-		// Only trigger ONE filter to reload boats (avoid duplicate AJAX calls)
-		setTimeout(function() {
-			$('#boat_category').trigger('change');
-		}, 100); // Increased to 100ms for smoother Select2 reset
-	});
-
-		// Initial load (in case filters are pre-filled)
-		renderActiveFilters();
-
-		// End display filtered data
-
 
 		// Data table
 		$('.bl-data-table').DataTable({
@@ -231,8 +113,6 @@
             mode: "range",
             minDate: "today",
             dateFormat: "d.m.Y",
-
-            // 🚫 No default date at all
             defaultDate: null,
 
             disable: [
@@ -264,8 +144,37 @@
                 }
             }
         });
-    });
 
+        $('#filter-desired-boat-form').on('submit', function () {
+
+            var $dateInput = $('#dateRange');
+            var dateValue  = $.trim($dateInput.val());
+
+            if (!dateValue) return;
+
+            var parts = [];
+
+            // Handle both "to" and "-"
+            if (dateValue.indexOf(' to ') !== -1) {
+                parts = dateValue.split(' to ');
+            } else if (dateValue.indexOf(' - ') !== -1) {
+                parts = dateValue.split(' - ');
+            }
+
+            if (parts.length !== 2) return;
+
+            function toApiFormat(dateStr) {
+                var d = $.trim(dateStr).split('.');
+                return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
+            }
+
+            $('#dateFrom').val(toApiFormat(parts[0]));
+            $('#dateTo').val(toApiFormat(parts[1]));
+
+            // Remove raw date field from request
+            $dateInput.prop('disabled', true);
+        });
+    });
 
 })( jQuery );
 

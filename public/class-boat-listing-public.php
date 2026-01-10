@@ -123,7 +123,8 @@ class Boat_Listing_Public {
 		wp_enqueue_script( $this->plugin_name . '_fancybox', '//cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox/fancybox.umd.js', array( 'jquery' ), $this->version, false );
 		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/boat-listing-public.js', array( 'jquery' ), $this->version, false );
 		wp_enqueue_script( 'nausys-boat-ajax', plugin_dir_url( __FILE__ ) . 'js/boat-listing-ajax.js', array( 'jquery' ), $this->version, false );
-		
+		wp_enqueue_script( 'boat-filter-page', plugin_dir_url( __FILE__ ) . 'js/boat-filter-page.js', array( 'jquery' ), $this->version, false );
+
 		wp_localize_script('nausys-boat-ajax', 'nausys_ajax_obj', [
 			'ajax_url' => admin_url('admin-ajax.php'),
 			'nonce'    => wp_create_nonce('nausys_nonce'),
