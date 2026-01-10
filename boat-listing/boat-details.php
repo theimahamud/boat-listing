@@ -8,8 +8,6 @@ function render_single_boat_by_query() {
     $current_year = date('Y');
     $boat_id = sanitize_text_field($_GET['yachtId'] ?? '');
     $country = sanitize_text_field($_GET['country'] ?? '');
-    $dateFrom = sanitize_text_field($_GET['dateFrom'] ?? '');
-    $dateTo = sanitize_text_field($_GET['dateTo'] ?? '');
     $productName = sanitize_text_field($_GET['productName'] ?? '');
     $charterType = sanitize_text_field($_GET['charterType'] ?? '');
     $cabin = sanitize_text_field($_GET['cabin'] ?? '');
@@ -26,8 +24,8 @@ function render_single_boat_by_query() {
     $modelId = sanitize_text_field($_GET['modelId'] ?? '');
     $flexibility = sanitize_text_field($_GET['flexibility'] ?? '');
 
-    $default_date_from = $current_year . '-01-01T00:00:00'; // Jan 1 current year with time
-    $default_date_to = $current_year . '-12-31T00:00:00';   // Dec 31 current year with time
+    $default_date_from = $current_year . '-01-01T00:00:00';
+    $default_date_to = $current_year . '-12-31T00:00:00';
 
     $date_from = sanitize_text_field($_GET['dateFrom'] ?? $default_date_from);
     $date_to   = sanitize_text_field($_GET['dateTo'] ?? $default_date_to);
@@ -42,23 +40,23 @@ function render_single_boat_by_query() {
 
     // Prepare all filters for API call including the specific yachtId
     $all_filters = [
-        'country' => $country,
-        'productName' => $productName,
-        'charterType' => $charterType,
-        'person' => $person,
-        'cabin' => $cabin,
-        'year' => $year,
-        'berths' => $berths,
-        'wc' => $wc,
-        'minLength' => $minLength,
-        'maxLength' => $maxLength,
-        'companyId' => $companyId,
-        'baseFromId' => $baseFromId,
-        'baseToId' => $baseToId,
-        'sailingAreaId' => $sailingAreaId,
-        'modelId' => $modelId,
-        'flexibility' => $flexibility,
-        'yachtId' => [$boat_id], // Specific yacht ID for single offer
+            'country' => $country,
+            'productName' => $productName,
+            'charterType' => $charterType,
+            'person' => $person,
+            'cabin' => $cabin,
+            'year' => $year,
+            'berths' => $berths,
+            'wc' => $wc,
+            'minLength' => $minLength,
+            'maxLength' => $maxLength,
+            'companyId' => $companyId,
+            'baseFromId' => $baseFromId,
+            'baseToId' => $baseToId,
+            'sailingAreaId' => $sailingAreaId,
+            'modelId' => $modelId,
+            'flexibility' => $flexibility,
+            'yachtId' => [$boat_id],
     ];
 
     // Remove empty values but keep meaningful zeros and arrays
@@ -66,13 +64,43 @@ function render_single_boat_by_query() {
         return $value !== '' && $value !== null && (!is_array($value) || !empty($value));
     });
 
-    $prices = $helper->get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters_for_api);
+    // ========== CRITICAL CACHE #1: BOAT DATA (24 HOURS) ==========
+    $cache_key_boat = 'bl_boat_' . $boat_id;
+    $boat_data = get_transient($cache_key_boat);
+
+    if ($boat_data === false) {
+        error_log("🔍 Cache MISS for boat: {$boat_id}");
+        $boat_data = $helper->fetch_all_boats($boat_id);
+
+        if (!empty($boat_data)) {
+            set_transient($cache_key_boat, $boat_data, DAY_IN_SECONDS);
+            error_log("💾 Cached boat data: {$boat_id}");
+        }
+    } else {
+        error_log("✅ Cache HIT for boat: {$boat_id}");
+    }
+    // ============================================================
+
+    // ========== CRITICAL CACHE #2: PRICE DATA (1 HOUR) ==========
+    $cache_key_price = 'bl_price_' . md5($boat_id . $date_from . $date_to . serialize($filters_for_api));
+    $prices = get_transient($cache_key_price);
+
+    if ($prices === false) {
+        error_log("🔍 Cache MISS for prices: boat {$boat_id}");
+        $prices = $helper->get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters_for_api);
+
+        if (!empty($prices)) {
+            set_transient($cache_key_price, $prices, HOUR_IN_SECONDS);
+            error_log("💾 Cached price data: {$boat_id}");
+        }
+    } else {
+        error_log("✅ Cache HIT for prices: boat {$boat_id}");
+    }
+    // ============================================================
 
     if (empty($boat_id)) {
         return '<p>No boat ID provided.</p>';
     }
-
-    $boat_data = $helper->fetch_all_boats($boat_id);
 
     if (empty($boat_data)) {
         return '<p>Boat not found.</p>';
@@ -89,9 +117,9 @@ function render_single_boat_by_query() {
     $back_params = [];
 
     $filter_params = [
-        'country', 'productName', 'charterType', 'person', 'cabin', 'year',
-        'berths', 'wc', 'minLength', 'maxLength', 'companyId', 'baseFromId',
-        'baseToId', 'sailingAreaId', 'modelId', 'flexibility', 'dateFrom', 'dateTo'
+            'country', 'productName', 'charterType', 'person', 'cabin', 'year',
+            'berths', 'wc', 'minLength', 'maxLength', 'companyId', 'baseFromId',
+            'baseToId', 'sailingAreaId', 'modelId', 'flexibility', 'dateFrom', 'dateTo'
     ];
 
     foreach ($filter_params as $param) {
@@ -101,7 +129,7 @@ function render_single_boat_by_query() {
     }
 
     $back_url = site_url('/boat-filter' . (!empty($back_params) ? '?' . implode('&', $back_params) : ''));
-    $show_back_button = !empty($back_params); // Only show if we have filters to go back to
+    $show_back_button = !empty($back_params);
 
     ob_start();
     ?>
@@ -172,7 +200,7 @@ function render_single_boat_by_query() {
                     <li><span><?php _e('Length (Feet):', 'boat-listing'); ?></span> <?php echo !empty($data['length']) ? esc_html($data['length']) : __('N/A', 'boat-listing'); ?> </li>
                 </ul>
             </div>
-           
+
             <button class="boat-book-now" data-id="<?php echo $boat_id; ?>">Request to book</button>
         </div>
     </div>
@@ -215,7 +243,7 @@ function render_single_boat_by_query() {
                         <li><span><?php _e('Berths (Total):', 'boat-listing'); ?></span>
                             <?php echo esc_html($data['berths'] ?? 'N/A'); ?>
                         </li>
-                        
+
                     </ul>
                 </div>
 
@@ -337,291 +365,93 @@ function render_single_boat_by_query() {
         </div>
     </div>
 
-    <!-- <div class="boat-listing-tab">
-        <ul>
-            <li><a href="#yachtBase">Yacht Base</a></li>
-            <li><a href="#yachtDetails">Yacht Details</a></li>
-            <li><a href="#yachtPrice">Yacht Prices</a></li>
-        </ul>
-
-        <div id="yachtBase">
-            <div class="yachtBase">
-                <ul>
-                    <li>
-                        <span><?php //_e('Check In Time:', 'boat-listing'); ?></span>
-                        <?php //echo !empty($data['defaultCheckInTime']) ? esc_html($data['defaultCheckInTime']) : __('N/A', 'boat-listing'); ?>
-                    </li>
-
-                    <li>
-                        <span><?php //_e('Check Out Time:', 'boat-listing'); ?></span>
-                        <?php //echo !empty($data['defaultCheckOutTime']) ? esc_html($data['defaultCheckOutTime']) : __('N/A', 'boat-listing'); ?>
-                    </li>
-
-                    <li>
-                        <span><?php //_e('Disabled:', 'boat-listing'); ?></span>
-                        <?php //echo isset($data['disabled']) ? esc_html($data['disabled'] ? 'Yes' : 'No') : __('N/A', 'boat-listing'); ?>
-                    </li>
-
-                    <li>
-                        <span><?php //_e('Base Delay Note:', 'boat-listing'); ?></span>
-                        <?php //echo !empty($data['comment']) ? esc_html($data['comment']) : __('N/A', 'boat-listing'); ?>
-                    </li>
-
-                    <li>
-                        <span><?php //_e('Return To Base Note:', 'boat-listing'); ?></span>
-                        <?php // !empty($data['comment']) ? esc_html($data['comment']) : __('N/A', 'boat-listing'); ?>
-                    </li>
-
-                    <li>
-                        <span><?php //_e('Secondary Base:', 'boat-listing'); ?></span>
-                        <?php //echo !empty($data['secondaryBase']) ? esc_html($data['secondaryBase']) : __('N/A', 'boat-listing'); ?>
-                    </li>
-
-                    <li>
-                        <span><?php //_e('Location:', 'boat-listing'); ?></span>
-                        <?php //echo !empty($data['homeBase']) ? esc_html($data['homeBase']) : __('N/A', 'boat-listing'); ?>
-                    </li>
-                </ul>
-
-                <div class="boat-map">
-                    <?php
-                    //$homeBase = urlencode((string) ($data['homeBase'] ?? ''));
-                    ?>
-
-                    <iframe
-                            src="https://maps.google.com/maps?q=<?php //echo esc_attr($homeBase); ?>&z=14&output=embed"
-                            width="600"
-                            height="450"
-                            style="border:0;"
-                            allowfullscreen
-                            loading="lazy"
-                            referrerpolicy="no-referrer-when-downgrade">
-                    </iframe>
-                </div>
-            </div>
-        </div>
-
-        <div id="yachtDetails">
-            <div class="yachtdeails">
-                <div class="features yachtdeails-info">
-                    <h5>Features</h5>
-                    <ul>
-                        <li><span><?php //_e('Yacht Name:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['name'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Yacht Type:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['kind'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Model:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['model'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Yacht Age:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['year'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Yacht Length (m):', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['length'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Beam (m):', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['beam'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Draft (m):', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['draught'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Engine(s):', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['engine'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Fuel Capacity:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['fuelCapacity'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //('Water Capacity:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['waterCapacity'] ?? 'N/A'); ?>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="layout yachtdeails-info">
-                    <h5>Layout</h5>
-                    <ul>
-                        <li>
-                            <span><?php //_e('Yacht Layout:', 'boat-listing'); ?></span>
-                            <?php
-                        //     if (!empty($data['images'])) {
-                        //         foreach ($data['images'] as $img) {
-                        //             if (!empty($img['url']) && stripos($img['name'], 'layout') !== false) {
-                        //                 echo '<a href="' . esc_url($img['url']) . '" target="_blank">
-                        //     <img src="' . esc_url($img['url']) . '" style="max-width:60px;margin:5px;">
-                        //   </a>';
-                        //             }
-                        //         }
-                        //     }
-                            ?>
-                        </li>
-                        <li><span><?php //_e('Max Persons:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['maxPeopleOnBoard'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Cabins:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['cabins'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Total Showers / WC:', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['wc'] ?? 'N/A'); ?>
-                        </li>
-
-                        <li><span><?php //_e('Berths (Total):', 'boat-listing'); ?></span>
-                            <?php //echo esc_html($data['berths'] ?? 'N/A'); ?>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <div id="yachtPrice">
-            <div class="yachtPrice">
-                <?php //if (!empty($prices['rows'])): ?>
-                    <table class="table table-stripe">
-                        <tr>
-                            <th>Product</th>
-                            <th>From</th>
-                            <th>To</th>
-                            <th>Price</th>
-                            <th>Currency</th>
-                        </tr>
-
-                        <?php //foreach ($prices['rows'] as $row): ?>
-                            <tr>
-                                <td>
-                                    <?php
-                                    // $product = $row['product'] ?? '';
-
-                                    // // Replace underscores with space
-                                    // $product = str_replace('_', ' ', $product);
-
-                                    // // Add space before capital letters (CamelCase → words)
-                                    // $product = preg_replace('/(?<!^)([A-Z])/', ' $1', $product);
-
-                                    // echo esc_html(trim($product));
-                                    ?>
-                                </td>
-                                <td>
-                                    <?php //echo esc_html(date('Y-m-d', strtotime($row['dateFrom']))); ?>
-                                </td>
-                                <td>
-                                    <?php //echo esc_html(date('Y-m-d', strtotime($row['dateTo']))); ?>
-                                </td>
-                                <td><?php //echo esc_html($row['price']); ?></td>
-                                <td><?php //echo esc_html($row['currency']); ?></td>
-                            </tr>
-                        <?php //endforeach; ?>
-                    </table>
-                <?php //else: ?>
-                    <p>Price not available</p>
-                <?php //endif; ?>
-            </div>
-        </div>
-         <div id="yachtCabinsDetails">
-            <div class="yachtcabinsdetails">
-                <?php //if (!empty($data['yachtCabinDetails'])): ?>
-                    <?php //foreach ($data['yachtCabinDetails'] as $detail): 
-                        //$cabin = $detail['yachtCabin'];
-                        //$quantity = $detail['quantity'];
-                    ?>
-                        <div class="cabin-item">
-                            <h5><?php //echo esc_html($cabin['cabinName'] ?? 'Cabin'); ?> (x<?php //echo intval($quantity); ?>)</h5>
-                            <ul>
-                                <li><strong>Type:</strong> <?php //echo esc_html($cabin['cabinType'] ?? ''); ?></li>
-                                <li><strong>Position:</strong> <?php // echo esc_html($cabin['cabinPosition'] ?? ''); ?></li>
-                                <?php //if (!empty($cabin['description'])): ?>
-                                    <li><strong>Description:</strong> <?php //echo esc_html($cabin['description']); ?></li>
-                                <?php //endif; ?>
-                            </ul>
-                        </div>
-                    <?php //endforeach; ?>
-                <?php //else: ?>
-                    <p>No cabin details available.</p>
-                <?php //endif; ?>
-            </div>
-        </div> -->
-
-        <!-- <div id="yachtCompanyDetails">
-            <ul>
-                <li><span><?php //_e('Name:', 'boat-listing'); ?></span> <?php //echo !empty($company['name']) ? esc_html($company['name']) : __('N/A', 'boat-listing'); ?></li>
-                <li><span><?php //_e('Address:', 'boat-listing'); ?></span> <?php //echo !empty($company['address']) ? esc_html($company['address']) : __('N/A', 'boat-listing'); ?></li>
-                <li><span><?php //_e('City:', 'boat-listing'); ?></span> <?php //echo !empty($company['city']) ? esc_html($company['city']) : __('N/A', 'boat-listing'); ?></li>
-                <li><span><?php //_e('Zip Code:', 'boat-listing'); ?></span> <?php //echo !empty($company['zip']) ? esc_html($company['zip']) : __('N/A', 'boat-listing'); ?></li>
-                <li><span><?php //_e('Vatcode:', 'boat-listing'); ?></span> <?php //echo !empty($company['vatcode']) ? esc_html($company['vatcode']) : __('N/A', 'boat-listing'); ?></li>
-                <li><span><?php //_e('Phone:', 'boat-listing'); ?></span> <?php //echo !empty($company['phone']) ? esc_html($company['phone']) : __('N/A', 'boat-listing'); ?></li>
-            </ul>
-        </div>
-
-    </div> -->
     <?php
-
     // This shortcode for booking modal
     echo do_shortcode('[book_now_modal_shortcode]');
     ?>
 
     <?php if ($show_back_button): ?>
-    <!-- Enhanced navigation JavaScript for details page -->
-    <script>
-    jQuery(document).ready(function($) {
+        <!-- Enhanced navigation JavaScript for details page -->
+        <script>
+            jQuery(document).ready(function($) {
 
-        // Handle browser back button to go to filter page if came from there
-        var referrer = document.referrer;
-        if (referrer && referrer.includes('/boat-filter')) {
-            // User came from filter page - enhance back button behavior
-            console.log('🔍 User came from filter page, enhancing navigation');
+                // Handle browser back button to go to filter page if came from there
+                var referrer = document.referrer;
+                if (referrer && referrer.includes('/boat-filter')) {
+                    // User came from filter page - enhance back button behavior
+                    console.log('🔍 User came from filter page, enhancing navigation');
 
-            // Handle browser back button
-            window.addEventListener('popstate', function(event) {
-                if (referrer.includes('/boat-filter')) {
-                    window.location.href = '<?php echo esc_js($back_url); ?>';
+                    // Handle browser back button
+                    window.addEventListener('popstate', function(event) {
+                        if (referrer.includes('/boat-filter')) {
+                            window.location.href = '<?php echo esc_js($back_url); ?>';
+                        }
+                    });
+
+                    // Add keyboard shortcut (Escape key) for quick back navigation
+                    $(document).keydown(function(e) {
+                        if (e.keyCode === 27) { // Escape key
+                            window.location.href = '<?php echo esc_js($back_url); ?>';
+                        }
+                    });
+
+                    // Add visual feedback for back button
+                    $('.back-to-results a').on('click', function() {
+                        $(this).css('opacity', '0.7');
+                        console.log('🔙 Navigating back to search results with filters preserved');
+                    });
                 }
-            });
 
-            // Add keyboard shortcut (Escape key) for quick back navigation
-            $(document).keydown(function(e) {
-                if (e.keyCode === 27) { // Escape key
-                    window.location.href = '<?php echo esc_js($back_url); ?>';
+                // Log filter parameters being preserved for debugging
+                var urlParams = new URLSearchParams(window.location.search);
+                var filterParams = [];
+                var preservedParams = ['country', 'productName', 'charterType', 'person', 'cabin', 'year', 'dateFrom', 'dateTo'];
+
+                preservedParams.forEach(function(param) {
+                    if (urlParams.get(param)) {
+                        filterParams.push(param + '=' + urlParams.get(param));
+                    }
+                });
+
+                if (filterParams.length > 0) {
+                    console.log('🔗 Details page loaded with filter parameters:', filterParams.join('&'));
                 }
+
+                // Log cache performance
+                console.log('⚡ Cache Status - Boat: <?php echo ($boat_data !== false) ? "HIT" : "MISS"; ?>, Price: <?php echo ($prices !== false) ? "HIT" : "MISS"; ?>');
+
             });
-
-            // Add visual feedback for back button
-            $('.back-to-results a').on('click', function() {
-                $(this).css('opacity', '0.7');
-                console.log('🔙 Navigating back to search results with filters preserved');
-            });
-        }
-
-        // Log filter parameters being preserved for debugging
-        var urlParams = new URLSearchParams(window.location.search);
-        var filterParams = [];
-        var preservedParams = ['country', 'productName', 'charterType', 'person', 'cabin', 'year', 'dateFrom', 'dateTo'];
-
-        preservedParams.forEach(function(param) {
-            if (urlParams.get(param)) {
-                filterParams.push(param + '=' + urlParams.get(param));
-            }
-        });
-
-        if (filterParams.length > 0) {
-            console.log('🔗 Details page loaded with filter parameters:', filterParams.join('&'));
-        }
-
-    });
-    </script>
+        </script>
     <?php endif; ?>
 
     <?php
 
     return ob_get_clean();
+}
+
+/**
+ * AJAX handler to clear details page cache
+ */
+add_action('wp_ajax_bl_clear_details_cache', 'bl_clear_details_cache_handler');
+add_action('wp_ajax_nopriv_bl_clear_details_cache', 'bl_clear_details_cache_handler');
+
+function bl_clear_details_cache_handler() {
+    $boat_id = sanitize_text_field($_POST['boat_id'] ?? '');
+
+    if ($boat_id) {
+        delete_transient('bl_boat_' . $boat_id);
+
+        // Clear all price caches for this boat
+        global $wpdb;
+        $wpdb->query(
+                $wpdb->prepare(
+                        "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+                        '%_transient_bl_price_' . md5($boat_id . '%') . '%'
+                )
+        );
+
+        wp_send_json_success(['message' => 'Cache cleared for boat ' . $boat_id]);
+    } else {
+        wp_send_json_error(['message' => 'No boat ID provided']);
+    }
 }

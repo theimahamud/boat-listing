@@ -1,11 +1,17 @@
 jQuery(document).ready(function($) {
 
-    // Global variable to store current AJAX request for cancellation
+    // Configuration
+    var DEBOUNCE_DELAY = 800; // Wait 800ms after last change before searching
+    var REQUEST_TIMEOUT = 45000; // 45 seconds timeout
+    var MAX_RETRIES = 2;
+
+    // State management
     var currentAjaxRequest = null;
     var requestRetryCount = 0;
-    var maxRetries = 3;
+    var debounceTimer = null;
+    var lastRequestParams = null;
 
-    // Add loading state styles for buttons
+    // Add loading styles
     $('<style>')
         .prop('type', 'text/css')
         .html(`
@@ -33,17 +39,6 @@ jQuery(document).ready(function($) {
                 position: relative;
                 background-color: #e3f2fd !important;
             }
-            .pagination-loading:after {
-                content: '⟳';
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                color: #2196f3;
-                font-size: 14px;
-                animation: spin 1s linear infinite;
-                z-index: 1;
-            }
             @keyframes spin {
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
@@ -51,174 +46,206 @@ jQuery(document).ready(function($) {
         `)
         .appendTo('head');
 
-    // Global AJAX boat loader (no page reload)
-    window.loadBoatsAjax = function(paged, source) {
-        paged = paged || 1;
-        source = source || 'auto'; // 'filter', 'pagination', or 'auto'
-       // console.log('🚤 loadBoatsAjax called with page:', paged, 'source:', source);
-
-        // Cancel any existing request to prevent conflicts
+    /**
+     * Cancel any pending requests
+     */
+    function cancelPendingRequest() {
         if (currentAjaxRequest && currentAjaxRequest.readyState !== 4) {
-           // console.log('⏹️ Cancelling previous request...');
+            //console('⏹️ Cancelling pending request');
             currentAjaxRequest.abort();
             currentAjaxRequest = null;
         }
 
-        $('.boat-lists-loader').fadeIn();
-        //$('#boat-count').text('🔄 Loading boats...');
+        if (debounceTimer) {
+            clearTimeout(debounceTimer);
+            debounceTimer = null;
+        }
+    }
 
-        // Read current URL params
+    /**
+     * Check if request parameters have changed
+     */
+    function hasParamsChanged(newParams) {
+        if (!lastRequestParams) return true;
+        return JSON.stringify(newParams) !== JSON.stringify(lastRequestParams);
+    }
+
+    /**
+     * Optimized boat loading with debouncing and caching
+     */
+    window.loadBoatsAjax = function(paged, source) {
+        paged = paged || 1;
+        source = source || 'auto';
+
+        // Build request parameters
         var urlParams = new URLSearchParams(window.location.search);
-        var country = urlParams.get('country') || '';
-        var productName = urlParams.get('productName') || '';
-        var dateFrom = urlParams.get('dateFrom') || '';
-        var dateTo = urlParams.get('dateTo') || '';
-
-        // console.log('📋 URL Params:', {
-        //     country: country,
-        //     productName: productName,
-        //     dateFrom: dateFrom,
-        //     dateTo: dateTo
-        // });
-
-        // Build AJAX URL with GET params so PHP $_GET sees them
-        var ajaxUrl = nausys_ajax_obj.ajax_url;
-        var qs = [];
-        if (country) qs.push('country=' + encodeURIComponent(country));
-        if (productName) qs.push('productName=' + encodeURIComponent(productName));
-        if (dateFrom) qs.push('dateFrom=' + encodeURIComponent(dateFrom));
-        if (dateTo) qs.push('dateTo=' + encodeURIComponent(dateTo));
-        if (qs.length) ajaxUrl += '?' + qs.join('&');
-
-       // console.log('🌐 AJAX URL:', ajaxUrl);
-
-        // AJAX call (no page reload)
         var ajaxData = {
             action: 'bl_get_paginated_boats',
             paged: paged,
-            charter_type: $('#charterType').val(),
-            free_yacht: $('#dateRange').val(),
-            model: '', // Not present in filter page
-            company: '', // Not present in filter page
-            location: $('#country').val(),
-            cabin: $('#cabin').val(),
-            person: $('#people').val(),
-            year: $('#year').val(),
-            category: productName
+            charter_type: $('#charterType').val() || '',
+            free_yacht: $('#dateRange').val() || '',
+            model: '',
+            company: '',
+            location: $('#country').val() || '',
+            cabin: $('#cabin').val() || '',
+            person: $('#people').val() || '',
+            year: $('#year').val() || '',
+            category: urlParams.get('productName') || ''
         };
 
-       // console.log('📤 AJAX Data:', ajaxData);
+        // Check if this is a duplicate request
+        if (source !== 'pagination' && !hasParamsChanged(ajaxData)) {
+            //console('⏭️ Skipping duplicate request');
+            return;
+        }
 
-        // Make the AJAX request with proper error handling and retry logic
+        lastRequestParams = ajaxData;
+
+        // For filter operations, debounce to avoid rapid requests
+        if (source === 'filter') {
+            cancelPendingRequest();
+
+            //console(`⏳ Debouncing filter request (${DEBOUNCE_DELAY}ms)...`);
+
+            debounceTimer = setTimeout(function() {
+                executeBoatRequest(paged, source, urlParams, ajaxData);
+            }, DEBOUNCE_DELAY);
+
+            return;
+        }
+
+        // For pagination, execute immediately
+        executeBoatRequest(paged, source, urlParams, ajaxData);
+    };
+
+    /**
+     * Execute the actual AJAX request
+     */
+    function executeBoatRequest(paged, source, urlParams, ajaxData) {
+        cancelPendingRequest();
+
+        $('.boat-lists-loader').fadeIn();
+
+        // Build AJAX URL with GET params
+        var ajaxUrl = nausys_ajax_obj.ajax_url;
+        var qs = [];
+
+        ['country', 'productName', 'dateFrom', 'dateTo', 'charterType',
+            'person', 'cabin', 'year', 'berths', 'wc', 'minLength', 'maxLength',
+            'companyId', 'baseFromId', 'baseToId', 'sailingAreaId', 'modelId', 'flexibility'
+        ].forEach(function(param) {
+            var value = urlParams.get(param);
+            if (value) {
+                qs.push(param + '=' + encodeURIComponent(value));
+            }
+        });
+
+        if (qs.length) ajaxUrl += '?' + qs.join('&');
+
+        //console('📡 Executing boat request - Page:', paged, 'Source:', source);
+
+        // Make AJAX request
         currentAjaxRequest = $.ajax({
             url: ajaxUrl,
             type: 'POST',
-            timeout: 60000, // Increased to 60 seconds to match PHP timeout + buffer
+            timeout: REQUEST_TIMEOUT,
             data: ajaxData,
+            cache: true, // Enable jQuery caching
             beforeSend: function() {
-                // Only disable filter button when this is a filter operation
                 if (source === 'filter') {
                     $('#submitFilter').prop('disabled', true).addClass('loading');
-                   // console.log('📡 Starting filter API request...');
-                } else {
-                    //console.log('📡 Starting pagination API request...');
                 }
             },
             success: function(res) {
-                //console.log('✅ AJAX request successful');
-                requestRetryCount = 0; // Reset retry counter on success
+                //console('✅ Request successful');
+                requestRetryCount = 0;
                 $('.boat-lists-loader').fadeOut();
 
                 if (res.success && res.data) {
-                    // Update boat cards (same format as before)
                     $('.boat-lists').html(res.data.boats_html);
                     $('.boat-listing-pagi').html(res.data.pagination_html);
+
                     var total = res.data.total_boats || 0;
-                    var message = total > 0 ? '🔍 ' + total + ' boat' + (total > 1 ? 's' : '') + ' found' : '🚫 No boats found';
+                    var message = total > 0
+                        ? '🔍 ' + total + ' boat' + (total > 1 ? 's' : '') + ' found'
+                        : '🚫 No boats found';
                     $('#boat-count').text(message);
+
+                    // Scroll to top of results smoothly
+                    if (source === 'pagination') {
+                        $('html, body').animate({
+                            scrollTop: $('.boat-listing-area').offset().top - 100
+                        }, 400);
+                    }
                 } else {
                     $('.boat-lists').html('<p>No boats found.</p>');
                     $('#boat-count').text('🚫 No boats found');
                 }
             },
             error: function(xhr, status, error) {
-                //console.log('❌ AJAX request failed:', status, error);
-
                 $('.boat-lists-loader').fadeOut();
 
                 if (status === 'abort') {
-                   // console.log('⏹️ Request was cancelled (this is normal)');
-                    return; // Don't show error for cancelled requests
+                    //console('⏹️ Request cancelled');
+                    return;
                 }
 
+                console.error('❌ Request failed:', status, error);
+
+                // Handle timeout with retry
+                if (status === 'timeout' && requestRetryCount < MAX_RETRIES) {
+                    requestRetryCount++;
+                    //console(`🔄 Retry ${requestRetryCount}/${MAX_RETRIES}...`);
+
+                    setTimeout(function() {
+                        executeBoatRequest(paged, source, urlParams, ajaxData);
+                    }, 2000);
+                    return;
+                }
+
+                // Show appropriate error message
+                var errorMsg = '❌ Error loading boats. ';
                 if (status === 'timeout') {
-                   // console.log('⏰ Request timed out');
-                    if (requestRetryCount < maxRetries) {
-                        requestRetryCount++;
-                       // console.log('🔄 Retrying request (' + requestRetryCount + '/' + maxRetries + ')...');
-                        setTimeout(function() {
-                            loadBoatsAjax(paged, source);
-                        }, 2000); // Retry after 2 seconds
-                        return;
-                    } else {
-                        $('.boat-lists').html('<p>⏰ Request timed out. The server might be busy. Please try again.</p>');
-                        $('#boat-count').text('�� Timeout');
-                    }
+                    errorMsg = '⏰ Request timed out. The API might be slow. ';
                 } else if (xhr.status === 0) {
-                    //console.log('🔌 Network connection issue');
-                    $('.boat-lists').html('<p>🔌 Network connection issue. Please check your connection and try again.</p>');
-                    $('#boat-count').text('🔌 No connection');
+                    errorMsg = '🔌 Connection issue. ';
                 } else if (xhr.status >= 500) {
-                   // console.log('🚨 Server error:', xhr.status);
-                    $('.boat-lists').html('<p>🚨 Server error (' + xhr.status + '). Please try again later.</p>');
-                    $('#boat-count').text('🚨 Server error');
-                } else {
-                   // console.log('❌ Unknown error:', xhr.status, error);
-                    $('.boat-lists').html('<p>❌ Error loading boats. Please try again.</p>');
-                    $('#boat-count').text('❌ Error');
+                    errorMsg = '🚨 Server error. ';
                 }
+                errorMsg += '<a href="#" onclick="location.reload(); return false;">Try again</a>';
 
-                requestRetryCount = 0; // Reset retry counter
+                $('.boat-lists').html('<p>' + errorMsg + '</p>');
+                $('#boat-count').text('❌ Error');
+
+                requestRetryCount = 0;
             },
             complete: function() {
-                // Only re-enable filter button if it was disabled (filter operation)
                 if (source === 'filter') {
                     $('#submitFilter').prop('disabled', false).removeClass('loading');
-                   // console.log('🏁 Filter AJAX request completed');
-                } else {
-                   // console.log('🏁 Pagination AJAX request completed');
                 }
-
-                // Always clear pagination loading states
                 $('.bl-page').removeClass('pagination-loading');
-
                 currentAjaxRequest = null;
             }
         });
-    };
+    }
 
-    // Populate inputs from URL params (essential + optional)
+    /**
+     * Populate filters from URL
+     */
     function populateFiltersFromUrl() {
         var urlParams = new URLSearchParams(window.location.search);
 
-        //console.log('🔍 Populating filters from URL - checking for essential and optional params:');
-
-        // Essential parameters (always check these)
         if (urlParams.get('country')) {
-           // console.log('  - Country: ' + urlParams.get('country'));
             $('#country').val(urlParams.get('country')).trigger('change.select2');
         }
 
         if (urlParams.get('productName')) {
-           // console.log('  - ProductName: ' + urlParams.get('productName'));
             $('#productName').val(urlParams.get('productName')).trigger('change.select2');
         }
 
         if (urlParams.get('dateFrom') && urlParams.get('dateTo')) {
             var dateFrom = urlParams.get('dateFrom').replace('T00:00:00', '');
             var dateTo = urlParams.get('dateTo').replace('T00:00:00', '');
-
-            //console.log('  - Dates: ' + dateFrom + ' to ' + dateTo);
 
             function formatDateForDisplay(isoDate) {
                 var parts = isoDate.split('-');
@@ -229,107 +256,67 @@ jQuery(document).ready(function($) {
             $('#dateRange').val(displayDate);
         }
 
-        // Optional parameters (only if they exist - coming from filter page)
-        if (urlParams.get('charterType')) {
-           // console.log('  - CharterType: ' + urlParams.get('charterType'));
-            $('#charterType').val(urlParams.get('charterType')).trigger('change.select2');
-        }
-
-        if (urlParams.get('person')) {
-           // console.log('  - Person: ' + urlParams.get('person'));
-            $('#people').val(urlParams.get('person')).trigger('change.select2');
-        }
-
-        if (urlParams.get('cabin')) {
-           // console.log('  - Cabin: ' + urlParams.get('cabin'));
-            $('#cabin').val(urlParams.get('cabin')).trigger('change.select2');
-        }
-
-        if (urlParams.get('year')) {
-          //  console.log('  - Year: ' + urlParams.get('year'));
-            $('#year').val(urlParams.get('year')).trigger('change.select2');
-        }
-
-        // Count total parameters for debugging
-        var totalParams = Array.from(urlParams.keys()).length;
-        if (totalParams <= 4) {
-            //console.log('✅ Simple search from home page (' + totalParams + ' params)');
-        } else {
-            //console.log('🔧 Advanced search with additional filters (' + totalParams + ' params)');
-        }
+        // Optional parameters
+        ['charterType', 'person', 'cabin', 'year'].forEach(function(param) {
+            var value = urlParams.get(param);
+            if (value) {
+                var fieldMap = {
+                    'person': 'people',
+                    'charterType': 'charterType'
+                };
+                var fieldId = fieldMap[param] || param;
+                $('#' + fieldId).val(value).trigger('change.select2');
+            }
+        });
     }
 
-    // Filter button click (AJAX + URL update, no reload)
+    /**
+     * Filter button click handler
+     */
     $('#submitFilter').on('click', function() {
-       // console.log('🔍 Filter button clicked');
+        //console('🔍 Filter button clicked');
 
-        // Start with ALL existing URL parameters to preserve everything
         var currentUrlParams = new URLSearchParams(window.location.search);
         var params = [];
 
-        //console.log('🔄 Preserving existing URL parameters...');
-
-        // Preserve all existing URL parameters (including empty ones for API filtering)
+        // Preserve existing parameters
         for (var [key, value] of currentUrlParams.entries()) {
             params.push(key + '=' + encodeURIComponent(value || ''));
-            //console.log('  - Preserved: ' + key + '=' + (value || 'empty'));
         }
 
-       // console.log('📝 Now checking form fields for updates...');
-
-        // Function to update or add parameter (always include for API filtering)
+        // Update parameters helper
         function updateParam(paramName, newValue) {
-            // Always remove existing parameter first
             params = params.filter(function(p) {
                 return !p.startsWith(paramName + '=');
             });
-
-            // Always add parameter (empty values are meaningful for API filtering)
             params.push(paramName + '=' + encodeURIComponent(newValue || ''));
-            if (newValue && newValue.trim() !== '') {
-                //console.log('  - Updated: ' + paramName + '=' + newValue);
-            } else {
-              //  console.log('  - Updated: ' + paramName + '= (empty for API)');
-            }
             return true;
         }
 
-        // Update parameters from form fields (only if they have values)
-        var country = $('#country').val();
-        updateParam('country', country);
-
-        var productName = $('#productName').val();
-        updateParam('productName', productName);
-
-        var charterType = $('#charterType').val();
-        updateParam('charterType', charterType);
+        // Update from form fields
+        updateParam('country', $('#country').val());
+        updateParam('productName', $('#productName').val());
+        updateParam('charterType', $('#charterType').val());
 
         var person = $('#people').val();
-        if (person && !isNaN(person) && parseInt(person) > 0 && parseInt(person) <= 50) {
+        if (person && !isNaN(person) && parseInt(person) > 0) {
             updateParam('person', person);
         }
 
         var cabin = $('#cabin').val();
-        if (cabin && !isNaN(cabin) && parseInt(cabin) > 0 && parseInt(cabin) <= 20) {
+        if (cabin && !isNaN(cabin) && parseInt(cabin) > 0) {
             updateParam('cabin', cabin);
         }
 
         var year = $('#year').val();
-        if (year && !isNaN(year) && parseInt(year) >= 1950 && parseInt(year) <= 2030) {
+        if (year && !isNaN(year) && parseInt(year) >= 1950) {
             updateParam('year', year);
         }
 
-        // Handle date range updates
+        // Handle date range
         var dateRange = $('#dateRange').val();
         if (dateRange) {
-           // console.log('📅 Processing date range:', dateRange);
-            var parts = [];
-            if (dateRange.indexOf(' to ') !== -1) {
-                parts = dateRange.split(' to ');
-            } else if (dateRange.indexOf(' - ') !== -1) {
-                parts = dateRange.split(' - ');
-            }
-
+            var parts = dateRange.split(' to ');
             if (parts.length === 2) {
                 function toIsoFormat(dateStr) {
                     var d = dateStr.trim().split('.');
@@ -349,67 +336,47 @@ jQuery(document).ready(function($) {
             }
         }
 
-        // Check for any additional form fields that might exist
-        var additionalFields = [
-            {field: '#berths', param: 'berths'},
-            {field: '#wc', param: 'wc'},
-            {field: '#minLength', param: 'minLength'},
-            {field: '#maxLength', param: 'maxLength'},
-            {field: '#companyId', param: 'companyId'},
-            {field: '#baseFromId', param: 'baseFromId'},
-            {field: '#baseToId', param: 'baseToId'},
-            {field: '#sailingAreaId', param: 'sailingAreaId'},
-            {field: '#modelId', param: 'modelId'},
-            {field: '#flexibility', param: 'flexibility'}
-        ];
-
-        additionalFields.forEach(function(filter) {
-            var value = $(filter.field).val();
-            if (value && value.trim() !== '') {
-                updateParam(filter.param, value);
-            }
-        });
-
-        // Build final URL with all preserved and updated parameters
+        // Build URL and update browser
         var newUrl = '/boat/boat-filter' + (params.length ? '?' + params.join('&') : '');
-        // console.log('🔗 Final URL with ALL parameters:', newUrl);
-        // console.log('📊 Total parameters in URL:', params.length);
-
-        // Update browser URL without page reload
         window.history.pushState({}, '', newUrl);
 
-        // Load boats via AJAX (no page reload)
-       // console.log('📡 Calling loadBoatsAjax with preserved parameters...');
+        // Load boats with debouncing
         loadBoatsAjax(1, 'filter');
     });
 
-
-    // Pagination clicks (AJAX only, no page reload)
+    /**
+     * Pagination click handler
+     */
     $(document).on('click', '.bl-page', function(e) {
         e.preventDefault();
         var page = $(this).data('page');
         var $clickedButton = $(this);
 
-        // Add temporary visual feedback to clicked pagination button
         $clickedButton.addClass('pagination-loading');
 
-        // Remove loading class after a short delay (will be removed when results load)
-        setTimeout(function() {
-            $clickedButton.removeClass('pagination-loading');
-        }, 3000);
-
-       // console.log('📄 Pagination clicked: page ' + page);
-        loadBoatsAjax(page, 'pagination'); // AJAX call, no page reload
+        loadBoatsAjax(page, 'pagination');
     });
 
-    // Initialize on page load
+    // Initialize
     populateFiltersFromUrl();
 
-    // Auto-load boats if URL has params
+    // Auto-load if URL has parameters
     var urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('country') || urlParams.get('productName') || urlParams.get('dateFrom')) {
         setTimeout(function() {
             loadBoatsAjax(1, 'auto');
-        }, 500);
+        }, 300); // Reduced delay
+    }
+
+    // Clear cache button (add to admin area)
+    if ($('#clear-boat-cache').length) {
+        $('#clear-boat-cache').on('click', function() {
+            $.post(nausys_ajax_obj.ajax_url, {
+                action: 'bl_clear_cache'
+            }, function(response) {
+                alert('Cache cleared!');
+                location.reload();
+            });
+        });
     }
 });

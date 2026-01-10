@@ -398,11 +398,8 @@ function bl_load_booking_modal() {
     $get_boat_data = $helper->fetch_all_boats( $boat_id );
     $boat_name = $get_boat_data['data']['name'];
 
-    $get_boat_location = $helper->fetch_all_locations( $get_boat_data['data']['locationId'] );
-    $boat_location = $get_boat_location['location_data']['name']['textEN'];
-
-    //print_r($boat_location);
-
+    // Use homeBase from boat data instead of non-existent fetch_all_locations method
+    $boat_location = $get_boat_data['data']['homeBase'] ?? 'Location N/A';
 
     if (!$boat_id) {
         echo '<p>Invalid boat ID.</p>';

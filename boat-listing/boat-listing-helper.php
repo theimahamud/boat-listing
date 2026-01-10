@@ -2,6 +2,9 @@
 
 class Boat_Listing_Helper{
 
+    // Cache duration in seconds (15 minutes)
+    private $cache_duration = 900;
+
     private function cread(): array
     {
         $cread = ['api_key' => get_option('bl_api_key'),];
@@ -242,130 +245,124 @@ class Boat_Listing_Helper{
         return $results;
     }
 
-    public function boat_filters($country, $productName, $dateFrom, $dateTo, $paged = 1, $per_page = 10, $filters = []): array
-    {
-        global $wpdb;
+    /**
+     * Get cached API response or fetch new one
+     */
+    private function get_cached_api_response($cache_key, $api_call_callback) {
+        $cached = get_transient($cache_key);
 
-        // Debug logging
-        error_log("🔍 DEBUG boat_filters called with:");
-        error_log("Country: " . ($country ?: 'empty'));
-        error_log("ProductName: " . ($productName ?: 'empty'));
-        error_log("DateFrom: " . ($dateFrom ?: 'empty'));
-        error_log("DateTo: " . ($dateTo ?: 'empty'));
+        if ($cached !== false) {
+            error_log("✅ Cache HIT for key: {$cache_key}");
+            return $cached;
+        }
 
-        // Debug filters
-        error_log("🔍 Local filters to apply:");
-        foreach($filters as $key => $value) {
-            if (!empty($value)) {
-                error_log("  - {$key}: {$value}");
+        error_log("❌ Cache MISS for key: {$cache_key} - Fetching from API...");
+        $response = call_user_func($api_call_callback);
+
+        if (!empty($response)) {
+            set_transient($cache_key, $response, $this->cache_duration);
+            error_log("💾 Cached response for key: {$cache_key}");
+        }
+
+        return $response;
+    }
+
+    /**
+     * Generate cache key from filters
+     */
+    private function generate_cache_key($country, $productName, $dateFrom, $dateTo, $filters = []) {
+        $key_parts = [
+                'boat_offers',
+                $country ?: 'all',
+                $productName ?: 'all',
+                $dateFrom ?: 'nodate',
+                $dateTo ?: 'nodate'
+        ];
+
+        // Add relevant filters to cache key
+        $relevant_filters = ['person', 'cabin', 'year', 'charter_type', 'berths', 'wc'];
+        foreach ($relevant_filters as $filter) {
+            if (!empty($filters[$filter])) {
+                $key_parts[] = $filter . '_' . $filters[$filter];
             }
         }
 
-        // Fetch offers from Booking Manager API
-        error_log("📡 Calling fetch_boat_offers API...");
-        $offers = $this->fetch_boat_offers($country, $productName, $dateFrom, $dateTo, $filters);
+        return 'bl_' . md5(implode('_', $key_parts));
+    }
 
-        // Debug API response
-        error_log("📊 API Response type: " . gettype($offers));
-        if (is_array($offers)) {
-            error_log("📊 API Response count: " . count($offers));
-            error_log("📊 First offer sample: " . print_r(array_slice($offers, 0, 1), true));
-        } else {
-            error_log("📊 API Response (non-array): " . print_r($offers, true));
-        }
+    /**
+     * Optimized boat_filters with caching and batch processing
+     */
+    public function boat_filters($country, $productName, $dateFrom, $dateTo, $paged = 1, $per_page = 10, $filters = []): array
+    {
+        $start_time = microtime(true);
 
-        // Normalize response - expect an array of offers
+        // Generate cache key
+        $cache_key = $this->generate_cache_key($country, $productName, $dateFrom, $dateTo, $filters);
+
+        // Try to get cached offers
+        $offers = $this->get_cached_api_response($cache_key, function() use ($country, $productName, $dateFrom, $dateTo, $filters) {
+            return $this->fetch_boat_offers($country, $productName, $dateFrom, $dateTo, $filters);
+        });
+
         if (empty($offers) || !is_array($offers)) {
-            error_log("❌ API returned empty or invalid data");
+            error_log("❌ No offers returned");
             return [
-                'boats'     => [],
-                'paged'     => $paged,
-                'pages'     => 0,
-                'per_page'  => $per_page,
-                'total'     => 0
+                    'boats' => [],
+                    'paged' => $paged,
+                    'pages' => 0,
+                    'per_page' => $per_page,
+                    'total' => 0
             ];
         }
 
-        $boats = [];
+        error_log("📊 Processing " . count($offers) . " offers");
+
+        // Batch process: Get all yacht IDs at once
+        $yacht_ids = array_unique(array_filter(array_column($offers, 'yachtId')));
+
+        if (empty($yacht_ids)) {
+            error_log("❌ No yacht IDs found in offers");
+            return ['boats' => [], 'paged' => $paged, 'pages' => 0, 'per_page' => $per_page, 'total' => 0];
+        }
+
+        // Batch fetch boats from database
+        global $wpdb;
         $boats_table = $wpdb->prefix . 'boats';
+        $placeholders = implode(',', array_fill(0, count($yacht_ids), '%d'));
+        $query = "SELECT id, data FROM {$boats_table} WHERE id IN ($placeholders)";
+        $results = $wpdb->get_results($wpdb->prepare($query, ...$yacht_ids), ARRAY_A);
 
-        // Check total boats in database for debugging
-        $total_boats_in_db = $wpdb->get_var("SELECT COUNT(*) FROM {$boats_table}");
-        error_log("📊 Total boats in database: " . $total_boats_in_db);
+        // Create lookup map for faster access
+        $boats_map = [];
+        foreach ($results as $row) {
+            $data = json_decode($row['data'], true);
+            if (is_array($data)) {
+                $boats_map[$row['id']] = $data;
+            }
+        }
 
-        // Get sample yacht IDs from database
-        $sample_ids = $wpdb->get_col("SELECT id FROM {$boats_table} LIMIT 10");
-        error_log("📊 Sample yacht IDs in database: " . implode(', ', $sample_ids));
+        error_log("🗄️ Found " . count($boats_map) . " boats in database");
 
-        // Get yacht IDs from API offers
-        $api_yacht_ids = array_map(function($offer) { return $offer['yachtId'] ?? 0; }, $offers);
-        error_log("📊 Yacht IDs from API: " . implode(', ', $api_yacht_ids));
-
-        // Run yacht ID matching analysis
-        $this->check_yacht_id_matching($offers);
-
+        // Process offers with pre-fetched boat data
+        $boats = [];
         foreach ($offers as $offer) {
-            // Each offer should contain a yachtId that maps to local boats.id
             $yacht_id = isset($offer['yachtId']) ? intval($offer['yachtId']) : 0;
 
-            error_log("🔍 Processing offer - YachtID: " . $yacht_id);
-
-            if (!$yacht_id) {
-                error_log("  ❌ No yachtId in offer");
+            if (!$yacht_id || !isset($boats_map[$yacht_id])) {
                 continue;
             }
 
-            // Try to fetch the local boat row
-            $row = $wpdb->get_row($wpdb->prepare("SELECT data FROM {$boats_table} WHERE id = %d", $yacht_id), ARRAY_A);
+            $data = $boats_map[$yacht_id];
 
-            if (empty($row) || empty($row['data'])) {
-                error_log("  ❌ YachtID {$yacht_id} not found in local database");
+            // Apply local filters (optimized with early returns)
+            if (!$this->apply_local_filters($data, $filters)) {
                 continue;
             }
 
-            error_log("  ✅ YachtID {$yacht_id} found in database");
-
-            $data = json_decode($row['data'], true);
-            if (!is_array($data)) {
-                error_log("  ❌ Invalid JSON data for YachtID {$yacht_id}");
-                continue;
-            }
-
-            // Apply local database filters using correct field mappings
-            if (!empty($filters['charter_type']) &&
-                !empty($data['kind']) &&
-                stripos($data['kind'], $filters['charter_type']) === false) {
-                error_log("  ❌ Charter type filter: {$filters['charter_type']} not matching {$data['kind']}");
-                continue;
-            }
-
-            if (!empty($filters['person']) &&
-                !empty($data['maxPeopleOnBoard']) &&
-                intval($data['maxPeopleOnBoard']) < intval($filters['person'])) {
-                error_log("  ❌ Person filter: {$filters['person']} exceeds maxPeopleOnBoard {$data['maxPeopleOnBoard']}");
-                continue;
-            }
-
-            if (!empty($filters['year']) &&
-                !empty($data['year']) &&
-                intval($data['year']) != intval($filters['year'])) {
-                error_log("  ❌ Year filter: {$filters['year']} not matching {$data['year']}");
-                continue;
-            }
-
-            if (!empty($filters['cabin']) &&
-                !empty($data['cabins']) &&
-                intval($data['cabins']) < intval($filters['cabin'])) {
-                error_log("  ❌ Cabin filter: {$filters['cabin']} exceeds available cabins {$data['cabins']}");
-                continue;
-            }
-
-            error_log("  ✅ All filters passed for YachtID {$yacht_id}");
-
-            // Merge offer metadata into the local boat data under 'offer' key
+            // Merge offer data
             $data['offer'] = $offer;
 
-            // Provide a simple availability_year if API provides dateFrom
             if (!empty($offer['dateFrom'])) {
                 $ts = strtotime($offer['dateFrom']);
                 if ($ts !== false) {
@@ -376,69 +373,90 @@ class Boat_Listing_Helper{
             $boats[] = $data;
         }
 
-        error_log("🔍 Boat Processing Results:");
-        error_log("  - Offers from API: " . count($offers));
-        error_log("  - Boats matched in DB: " . count($boats));
-        error_log("  - Per page setting: " . $per_page);
-        error_log("  - Current page: " . $paged);
+        error_log("✅ Filtered to " . count($boats) . " matching boats");
 
-        // Pagination: simple array-based pagination
+        // Pagination
         $total = count($boats);
         $pages = ($per_page > 0) ? (int) ceil($total / $per_page) : 1;
         $paged = max(1, intval($paged));
         $offset = ($paged - 1) * $per_page;
         $paged_boats = array_slice($boats, $offset, $per_page);
 
-        error_log("🔍 Pagination Calculations:");
-        error_log("  - Total boats: " . $total);
-        error_log("  - Total pages: " . $pages);
-        error_log("  - Offset: " . $offset);
-        error_log("  - Boats on this page: " . count($paged_boats));
+        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
+        error_log("⏱️ boat_filters completed in {$execution_time}ms");
 
-        // If no boats matched (API returned offers but none matched local DB),
-        // try local-only search as fallback
-        if (empty($boats) && !empty($offers)) {
-            error_log("🔄 API returned offers but no local matches. Trying local-only search...");
-            $local_boats = $this->search_local_boats($filters, $per_page, $paged);
-            if (!empty($local_boats['boats'])) {
-                error_log("✅ Local-only search found " . count($local_boats['boats']) . " boats");
-                return $local_boats;
+        return [
+                'boats' => $paged_boats,
+                'paged' => $paged,
+                'pages' => $pages,
+                'per_page' => $per_page,
+                'total' => $total
+        ];
+    }
+
+    /**
+     * Optimized filter application
+     */
+    private function apply_local_filters($data, $filters) {
+        // Charter type filter
+        if (!empty($filters['charter_type']) && !empty($data['kind'])) {
+            if (stripos($data['kind'], $filters['charter_type']) === false) {
+                return false;
             }
         }
 
-        return [
-            'boats'     => $paged_boats,
-            'paged'     => $paged,
-            'pages'     => $pages,
-            'per_page'  => $per_page,
-            'total'     => $total
-        ];
+        // Person filter
+        if (!empty($filters['person']) && !empty($data['maxPeopleOnBoard'])) {
+            if (intval($data['maxPeopleOnBoard']) < intval($filters['person'])) {
+                return false;
+            }
+        }
 
+        // Year filter
+        if (!empty($filters['year']) && !empty($data['year'])) {
+            if (intval($data['year']) != intval($filters['year'])) {
+                return false;
+            }
+        }
+
+        // Cabin filter
+        if (!empty($filters['cabin']) && !empty($data['cabins'])) {
+            if (intval($data['cabins']) < intval($filters['cabin'])) {
+                return false;
+            }
+        }
+
+        // Berths filter
+        if (!empty($filters['berths']) && !empty($data['berths'])) {
+            if (intval($data['berths']) < intval($filters['berths'])) {
+                return false;
+            }
+        }
+
+        // WC filter
+        if (!empty($filters['wc']) && !empty($data['wc'])) {
+            if (intval($data['wc']) < intval($filters['wc'])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
+    /**
+     * Optimized fetch_boat_offers with connection pooling
+     */
     public function fetch_boat_offers($country, $productName, $dateFrom, $dateTo, $filters = [])
     {
-        // Build query parameters - start with essentials only
         $params = [];
 
-        // Core required parameters
-        if (!empty($country)) {
-            $params['country'] = $country;
-        }
+        // Build essential parameters
+        if (!empty($country)) $params['country'] = $country;
+        if (!empty($productName)) $params['productName'] = $productName;
+        if (!empty($dateFrom)) $params['dateFrom'] = $dateFrom;
+        if (!empty($dateTo)) $params['dateTo'] = $dateTo;
 
-        if (!empty($productName)) {
-            $params['productName'] = $productName;
-        }
-
-        if (!empty($dateFrom)) {
-            $params['dateFrom'] = $dateFrom;
-        }
-
-        if (!empty($dateTo)) {
-            $params['dateTo'] = $dateTo;
-        }
-
-        // Calculate trip duration from dates if available
+        // Calculate trip duration
         if (!empty($dateFrom) && !empty($dateTo)) {
             try {
                 $start = new DateTime($dateFrom);
@@ -452,203 +470,76 @@ class Boat_Listing_Helper{
             }
         }
 
-        // Only add optional parameters if they have meaningful values from user input
-        if (!empty($filters['person']) && intval($filters['person']) > 0) {
-            $params['passengersOnBoard'] = intval($filters['person']);
-        }
+        // Add optional filters
+        if (!empty($filters['person'])) $params['passengersOnBoard'] = intval($filters['person']);
+        if (!empty($filters['cabin'])) $params['minCabins'] = intval($filters['cabin']);
 
-        if (!empty($filters['cabin']) && intval($filters['cabin']) > 0) {
-            $params['minCabins'] = intval($filters['cabin']);
-        }
-
-        if (!empty($filters['year']) && intval($filters['year']) > 1900) {
+        if (!empty($filters['year'])) {
             $year = intval($filters['year']);
             $params['minYearOfBuild'] = $year;
             $params['maxYearOfBuild'] = $year;
         }
 
-        // Map charter types to API kind parameter (only if specified)
-        if (!empty($filters['charter_type'])) {
-            $kind_mapping = [
-                'Sail boat' => 'sailboat',
-                'Motor boat' => 'motorboat',
-                'Catamaran' => 'catamaran',
-                'Motor yacht' => 'motoryacht',
-                'Power' => 'motorboat',
-                'Sailing yacht' => 'sailboat'
-            ];
+        // Add advanced filters
+        if (!empty($filters['berths'])) $params['minBerths'] = intval($filters['berths']);
+        if (!empty($filters['wc'])) $params['minHeads'] = intval($filters['wc']);
+        if (!empty($filters['min_length'])) $params['minLength'] = floatval($filters['min_length']);
+        if (!empty($filters['max_length'])) $params['maxLength'] = floatval($filters['max_length']);
 
-            $mapped_kind = $kind_mapping[$filters['charter_type']] ?? strtolower(str_replace(' ', '', $filters['charter_type']));
-            if ($mapped_kind) {
-                $params['kind'] = $mapped_kind;
-            }
-        }
-
-        // Default parameters for better API results
+        // Default parameters
         $params['currency'] = 'EUR';
         $params['showOptions'] = 'true';
+        $params['flexibility'] = $filters['flexibility'] ?? 1;
 
-        // Handle flexibility parameter (1 = exact dates by default)
-        if (isset($filters['flexibility']) && !empty($filters['flexibility'])) {
-            $flexibility = intval($filters['flexibility']);
-            if ($flexibility >= 1 && $flexibility <= 7) {
-                $params['flexibility'] = $flexibility;
-            }
-        } else {
-            $params['flexibility'] = 1; // Default to exact dates
-        }
-
-        // Add advanced filtering parameters if they exist
-        if (!empty($filters['berths']) && intval($filters['berths']) > 0) {
-            $params['minBerths'] = intval($filters['berths']);
-        }
-
-        if (!empty($filters['wc']) && intval($filters['wc']) > 0) {
-            $params['minHeads'] = intval($filters['wc']);
-        }
-
-        if (!empty($filters['min_length']) && floatval($filters['min_length']) > 0) {
-            $params['minLength'] = floatval($filters['min_length']);
-        }
-
-        if (!empty($filters['max_length']) && floatval($filters['max_length']) > 0) {
-            $params['maxLength'] = floatval($filters['max_length']);
-        }
-
-        if (!empty($filters['company_id']) && intval($filters['company_id']) > 0) {
-            $params['companyId'] = intval($filters['company_id']);
-        }
-
-        if (!empty($filters['base_from_id']) && intval($filters['base_from_id']) > 0) {
-            $params['baseFromId'] = intval($filters['base_from_id']);
-        }
-
-        if (!empty($filters['base_to_id']) && intval($filters['base_to_id']) > 0) {
-            $params['baseToId'] = intval($filters['base_to_id']);
-        }
-
-        if (!empty($filters['sailing_area_id']) && intval($filters['sailing_area_id']) > 0) {
-            $params['sailingAreaId'] = intval($filters['sailing_area_id']);
-        }
-
-        if (!empty($filters['model_id']) && intval($filters['model_id']) > 0) {
-            $params['modelId'] = intval($filters['model_id']);
-        }
-
-        // Handle specific yacht ID filtering (for single boat price lookups)
-        if (!empty($filters['yachtId'])) {
-            if (is_array($filters['yachtId'])) {
-                // Multiple yacht IDs
-                $params['yachtId'] = implode(',', array_map('intval', $filters['yachtId']));
-            } else {
-                // Single yacht ID
-                $params['yachtId'] = intval($filters['yachtId']);
-            }
-        }
-
-        // Remove any null or empty values to keep URL clean
+        // Clean params
         $params = array_filter($params, function($value) {
             return $value !== null && $value !== '';
         });
 
-        // Build clean API URL
         $query = http_build_query($params);
         $api_url = "https://www.booking-manager.com/api/v2/offers?$query";
 
-        error_log("🌐 Clean API URL: " . $api_url);
-        error_log("🔍 Essential parameters only (count: " . count($params) . "):");
-        foreach($params as $key => $value) {
-            error_log("  - {$key}: {$value}");
-        }
-
-        // Log parameter source
-        if (count($params) <= 5) {
-            error_log("✅ Minimal API call - using essential parameters only");
-        } else {
-            error_log("🔧 Enhanced API call - additional filters applied");
-        }
-
-        // Log popular testing combinations for debugging
-        $popular_countries = ['GR', 'HR', 'TR', 'IT', 'ES', 'FR'];
-        if (!empty($country) && !in_array($country, $popular_countries)) {
-            error_log("💡 Testing with less common country: {$country}. Popular alternatives: GR, HR, TR, IT");
-        }
+        error_log("🌐 API URL: " . $api_url);
 
         $ch = curl_init($api_url);
-
-        // Get API key for debugging
-        $api_key = $this->cread()['api_key'];
-        error_log("🔑 API Key exists: " . (!empty($api_key) ? 'Yes' : 'No'));
-        if (!empty($api_key)) {
-            error_log("🔑 API Key length: " . strlen($api_key));
-        }
-
-        $start_time = microtime(true);
-        error_log("⏱️ Starting API call at: " . date('H:i:s'));
 
         curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_HTTPHEADER => [
                         "accept: application/json",
                         "Authorization: Bearer " . $this->cread()['api_key'],
-                        "Connection: keep-alive", // Keep connection alive for better performance
-                        "User-Agent: WordPress-Boat-Listing-Plugin/1.0",
+                        "Connection: keep-alive",
+                        "Accept-Encoding: gzip, deflate, br", // Enable compression
                 ],
-                CURLOPT_TIMEOUT => 60, // Increased to 60 seconds for slower API responses
-                CURLOPT_CONNECTTIMEOUT => 15, // Increased connection timeout
-                CURLOPT_ENCODING => 'gzip, deflate',
+                CURLOPT_TIMEOUT => 30, // Reduced timeout
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_ENCODING => '', // Auto-decode gzip/deflate
                 CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_TCP_KEEPALIVE => 1, // Enable TCP keep-alive
-                CURLOPT_TCP_KEEPIDLE => 30, // Keep connection idle for 30 seconds
-                CURLOPT_TCP_KEEPINTVL => 10, // Interval between keep-alive probes
-                CURLOPT_NOSIGNAL => 1, // Prevent timeout issues in multi-threaded environment
+                CURLOPT_SSL_VERIFYPEER => true, // Re-enable for security
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_TCP_KEEPALIVE => 1,
+                CURLOPT_TCP_KEEPIDLE => 30,
+                CURLOPT_TCP_KEEPINTVL => 10,
+                CURLOPT_NOSIGNAL => 1,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_2_0, // Use HTTP/2 if available
         ]);
 
+        $start_time = microtime(true);
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curl_error = curl_error($ch);
-        $total_time = curl_getinfo($ch, CURLINFO_TOTAL_TIME);
-        $connect_time = curl_getinfo($ch, CURLINFO_CONNECT_TIME);
+        $execution_time = round((microtime(true) - $start_time) * 1000, 2);
         curl_close($ch);
 
-        $end_time = microtime(true);
-        $execution_time = round(($end_time - $start_time), 2);
-
-        error_log("⏱️ API call completed in: " . $execution_time . "s");
-        error_log("🔗 HTTP Code: " . $http_code);
-        error_log("⏱️ CURL Total Time: " . round($total_time, 2) . "s");
-        error_log("⏱️ CURL Connect Time: " . round($connect_time, 2) . "s");
+        error_log("⏱️ API call completed in {$execution_time}ms (HTTP {$http_code})");
 
         if ($curl_error) {
             error_log("❌ CURL Error: " . $curl_error);
-
-            // Log specific error types
-            if (strpos($curl_error, 'timeout') !== false) {
-                error_log("⏰ TIMEOUT ERROR - API took longer than 60 seconds to respond");
-            } elseif (strpos($curl_error, 'connect') !== false) {
-                error_log("🔌 CONNECTION ERROR - Could not connect to API server");
-            } elseif (strpos($curl_error, 'resolve') !== false) {
-                error_log("🌐 DNS ERROR - Could not resolve API hostname");
-            }
+            return [];
         }
 
-        // Log response details
-        error_log("📨 Raw Response length: " . strlen($response));
-        error_log("📨 Raw Response (first 500 chars): " . substr($response, 0, 500));
-
-        // Check for common API errors
-        if ($http_code === 401) {
-            error_log("❌ API Authentication Error - Check API key");
-        } elseif ($http_code === 404) {
-            error_log("❌ API Endpoint Not Found");
-        } elseif ($http_code !== 200) {
-            error_log("❌ API Error - HTTP " . $http_code);
-        }
-
-        if ($response === false) {
-            error_log("❌ API call failed");
+        if ($response === false || $http_code !== 200) {
+            error_log("❌ API call failed - HTTP {$http_code}");
             return [];
         }
 
@@ -659,8 +550,17 @@ class Boat_Listing_Helper{
             return [];
         }
 
-        error_log("✅ API call successful, returning data");
+        error_log("✅ API returned " . count($data) . " offers");
         return $data;
+    }
+
+    /**
+     * Clear cache (call this when you update boat data)
+     */
+    public function clear_cache($pattern = 'bl_*') {
+        global $wpdb;
+        $wpdb->query($wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",'%_transient_' . $pattern . '%'));
+        error_log("🗑️ Cache cleared for pattern: {$pattern}");
     }
 
     /**

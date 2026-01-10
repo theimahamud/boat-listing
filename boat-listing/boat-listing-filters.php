@@ -576,6 +576,16 @@
         wp_die();
     }
 
+    // Add to your functions.php or plugin file
+    add_action('wp_ajax_bl_clear_cache', 'bl_clear_cache_handler');
+    add_action('wp_ajax_nopriv_bl_clear_cache', 'bl_clear_cache_handler');
+
+    function bl_clear_cache_handler() {
+        $helper = new Boat_Listing_Helper();
+        $helper->clear_cache();
+        wp_send_json_success(['message' => 'Cache cleared successfully']);
+    }
+
 // Admin API Test Page
 add_action('admin_menu', function() {
     add_submenu_page(
