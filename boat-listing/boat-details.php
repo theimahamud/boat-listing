@@ -43,8 +43,8 @@ function render_single_boat_by_query() {
         return $value !== '' && $value !== null && (!is_array($value) || !empty($value));
     });
 
-    $boat_data = $helper->fetch_all_boats($boat_id);
-    $prices = $helper->get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters_for_api);
+    $boat_data = $helper->fetch_boat_data_cached($boat_id);
+    $prices = $helper->get_single_yacht_offer_details_cached($boat_id, $date_from, $date_to, $filters_for_api);
     // ============================================================
 
     if (empty($boat_id)) {

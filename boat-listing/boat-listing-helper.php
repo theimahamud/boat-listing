@@ -1064,12 +1064,84 @@ class Boat_Listing_Helper{
         ];
     }
 
+    public function get_single_yacht_offer_details_cached($boat_id, $date_from, $date_to, $filters = [])
+    {
+        // Build cache key from all parameters
+        $cache_params = [
+                'boat_id' => $boat_id,
+                'date_from' => $date_from,
+                'date_to' => $date_to,
+                'filters' => $filters
+        ];
+
+        // Sort filters for consistent cache keys
+        if (is_array($filters)) {
+            ksort($filters);
+        }
+
+        $cache_key = 'bl_yacht_price_' . md5(serialize($cache_params));
+
+        error_log("🔍 Details Cache Key: " . $cache_key);
+
+        // Try to get from cache
+        $cached_data = get_transient($cache_key);
+
+        if ($cached_data !== false) {
+            error_log("✅ CACHE HIT! Using cached price details for yacht {$boat_id}");
+            return $cached_data;
+        }
+
+        error_log("❌ CACHE MISS - Fetching fresh price details for yacht {$boat_id}");
+
+        // Not in cache - fetch fresh data
+        $price_details = $this->get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters);
+
+        // Only cache if we got valid results
+        if (!empty($price_details) && isset($price_details['rows'])) {
+            // Cache for 30 minutes (longer than filter page since details change less often)
+            set_transient($cache_key, $price_details, 30 * MINUTE_IN_SECONDS);
+            error_log("💾 Cached price details for yacht {$boat_id} for 30 minutes");
+        }
+
+        return $price_details;
+    }
+
     /**
-     * Get single yacht offer details for a specific boat with all search filters
+     * OPTION 2: Cache boat data separately (rarely changes)
+     * This caches the boat information itself (not prices)
+     */
+    public function fetch_boat_data_cached($boat_id)
+    {
+        $cache_key = 'bl_boat_data_' . $boat_id;
+
+        // Try to get from cache
+        $cached_data = get_transient($cache_key);
+
+        if ($cached_data !== false) {
+            error_log("✅ CACHE HIT! Using cached boat data for {$boat_id}");
+            return $cached_data;
+        }
+
+        error_log("❌ CACHE MISS - Fetching fresh boat data for {$boat_id}");
+
+        // Fetch from database
+        $boat_data = $this->fetch_all_boats($boat_id);
+
+        if (!empty($boat_data)) {
+            // Cache for 24 hours (boat data rarely changes)
+            set_transient($cache_key, $boat_data, 24 * HOUR_IN_SECONDS);
+            error_log("💾 Cached boat data for {$boat_id} for 24 hours");
+        }
+
+        return $boat_data;
+    }
+
+    /**
+     * Updated get_single_yacht_offer_details with better API handling
+     * (Use this as the non-cached version)
      */
     public function get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters = [])
     {
-        // If no date range provided, return basic structure
         if (empty($date_from) || empty($date_to)) {
             error_log("⚠️ No dates provided for price details");
             return [
@@ -1082,12 +1154,25 @@ class Boat_Listing_Helper{
 
         try {
             error_log("📡 Getting price details for yacht ID: {$boat_id}");
-            error_log("📅 Date range: {$date_from} to {$date_to}");
 
-            // Get boat data to find country
-            $boat_data = $this->fetch_all_boats($boat_id);
-            if (empty($boat_data)) {
-                error_log("❌ Boat {$boat_id} not found in database");
+            $country = $filters['country'] ?? '';
+            $productName = $filters['productName'] ?? '';
+
+            // Remove yachtId from API filters (API works better without it)
+            $api_filters = $filters;
+            unset($api_filters['yachtId']);
+
+            // Call the API - use cached version if available
+            $offers = $this->fetch_boat_offers_cached($country, $productName, $date_from, $date_to, $api_filters);
+
+            if (empty($offers)) {
+                // Fallback
+                error_log("🔄 Trying fallback API call");
+                $offers = $this->fetch_boat_offers_cached('', '', $date_from, $date_to, []);
+            }
+
+            if (empty($offers)) {
+                error_log("❌ No offers available");
                 return [
                         'min' => 'N/A',
                         'max' => 'N/A',
@@ -1096,69 +1181,24 @@ class Boat_Listing_Helper{
                 ];
             }
 
-            $boat = $boat_data['data'] ?? [];
-
-            // Use filters from URL (country, productName, etc.)
-            $country = $filters['country'] ?? '';
-            $productName = $filters['productName'] ?? '';
-
-            error_log("🔍 API filters: country={$country}, productName={$productName}");
-
-            // IMPORTANT: Do NOT add yachtId to filters when calling API
-            // The API returns better results without yachtId filter
-            $api_filters = $filters;
-            unset($api_filters['yachtId']); // Remove if exists
-
-            // Call the API without yachtId filter to get broader results
-            $offers = $this->fetch_boat_offers($country, $productName, $date_from, $date_to, $api_filters);
-
-            if (empty($offers)) {
-                error_log("⚠️ API returned no offers for {$country}, {$productName}");
-
-                // Fallback: Try without country/product restrictions
-                error_log("🔄 Trying fallback API call without country/product");
-                $offers = $this->fetch_boat_offers('', '', $date_from, $date_to, []);
-
-                if (empty($offers)) {
-                    error_log("❌ Even fallback API call returned empty");
-                    return [
-                            'min' => 'N/A',
-                            'max' => 'N/A',
-                            'currency' => 'EUR',
-                            'rows' => []
-                    ];
-                }
-            }
-
-            error_log("✅ API returned " . count($offers) . " total offers");
-
-            // NOW filter the offers for our specific yacht ID
+            // Filter for our specific yacht
             $prices = [];
             $currency = 'EUR';
-            $matching_offers = 0;
 
             foreach ($offers as $offer) {
                 if (isset($offer['yachtId']) && $offer['yachtId'] == $boat_id) {
-                    $matching_offers++;
 
                     $starting_price = floatval($offer['startPrice'] ?? $offer['price'] ?? 0);
-                    $final_price = floatval($offer['price'] ?? 0);
-                    $obligatory_extras = floatval($offer['obligatoryExtrasPrice'] ?? 0);
 
                     $price_info = [
                             'dateFrom' => $offer['dateFrom'] ?? '',
                             'dateTo' => $offer['dateTo'] ?? '',
                             'startPrice' => $starting_price,
                             'price' => $starting_price,
-                            'finalPrice' => $final_price,
-                            'obligatoryExtrasPrice' => $obligatory_extras,
-                            'totalPrice' => $starting_price,
                             'currency' => $offer['currency'] ?? 'EUR',
                             'securityDeposit' => floatval($offer['securityDeposit'] ?? 0),
-                            'yacht' => $offer['yacht'] ?? '',
                             'startBase' => $offer['startBase'] ?? '',
                             'endBase' => $offer['endBase'] ?? '',
-                            'product' => $offer['product'] ?? 'Bareboat'
                     ];
 
                     $prices[] = $price_info;
@@ -1166,10 +1206,7 @@ class Boat_Listing_Helper{
                 }
             }
 
-            error_log("📊 Found {$matching_offers} offers matching yacht ID {$boat_id}");
-
             if (empty($prices)) {
-                error_log("⚠️ No price offers found for yacht {$boat_id}");
                 return [
                         'min' => 'N/A',
                         'max' => 'N/A',
@@ -1178,12 +1215,9 @@ class Boat_Listing_Helper{
                 ];
             }
 
-            // Calculate min and max prices
             $all_starting_prices = array_column($prices, 'startPrice');
             $min_price = min($all_starting_prices);
             $max_price = max($all_starting_prices);
-
-            error_log("✅ Price range: {$min_price} - {$max_price} {$currency}");
 
             return [
                     'min' => number_format($min_price, 2),
@@ -1193,7 +1227,7 @@ class Boat_Listing_Helper{
             ];
 
         } catch (Exception $e) {
-            error_log("❌ Error getting price details for yacht {$boat_id}: " . $e->getMessage());
+            error_log("❌ Error: " . $e->getMessage());
             return [
                     'min' => 'N/A',
                     'max' => 'N/A',
@@ -1202,7 +1236,6 @@ class Boat_Listing_Helper{
             ];
         }
     }
-
     /**
      * Efficiently fetch boats by yacht IDs from API offers
      * This avoids N+1 query problem by batching database queries

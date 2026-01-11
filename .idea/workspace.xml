@@ -12,6 +12,9 @@
       <change beforePath="$PROJECT_DIR$/../../../.idea/modules.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../../.idea/php.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/../../../wp-config.php" beforeDir="false" afterPath="$PROJECT_DIR$/../../../wp-config.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/boat-listing/boat-details.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-details.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/boat-listing/boat-listing-helper.php" beforeDir="false" afterPath="$PROJECT_DIR$/boat-listing/boat-listing-helper.php" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -69,7 +72,7 @@
       <workItem from="1767973947693" duration="6292000" />
       <workItem from="1768014286159" duration="30496000" />
       <workItem from="1768102414298" duration="3025000" />
-      <workItem from="1768136770776" duration="3663000" />
+      <workItem from="1768136770776" duration="3840000" />
     </task>
     <servers />
   </component>
