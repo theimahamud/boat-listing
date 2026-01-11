@@ -164,35 +164,61 @@
 			}
 		});
 
-		$('#filter-desired-boat-form').on('submit', function () {
-			var $dateInput = $('#dateRange');
-			var dateValue  = $.trim($dateInput.val());
+        $('#filter-desired-boat-form').on('submit', function (e) {
+            e.preventDefault(); // stop form submission first
 
-			if (!dateValue) return;
+            var $dateInput = $('#dateRange');
+            var dateValue  = $.trim($dateInput.val());
 
-			var parts = [];
+            // ================= REQUIRED CHECK =================
+            if (!dateValue) {
+                alert('📅 Please select your travel dates');
+                $dateInput.focus();
+                return false;
+            }
 
-			// Handle both "to" and "-"
-			if (dateValue.indexOf(' to ') !== -1) {
-				parts = dateValue.split(' to ');
-			} else if (dateValue.indexOf(' - ') !== -1) {
-				parts = dateValue.split(' - ');
-			}
+            // ================= RANGE CHECK =================
+            var parts = [];
 
-			if (parts.length !== 2) return;
+            if (dateValue.indexOf(' to ') !== -1) {
+                parts = dateValue.split(' to ');
+            } else if (dateValue.indexOf(' - ') !== -1) {
+                parts = dateValue.split(' - ');
+            }
 
-			function toApiFormat(dateStr) {
-				var d = $.trim(dateStr).split('.');
-				return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
-			}
+            if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) {
+                alert('📅 Please select a valid date range (start and end date)');
+                $dateInput.focus();
+                return false;
+            }
 
-			$('#dateFrom').val(toApiFormat(parts[0]));
-			$('#dateTo').val(toApiFormat(parts[1]));
+            // ================= FORMAT FOR API =================
+            function toApiFormat(dateStr) {
+                var d = $.trim(dateStr).split('.');
+                if (d.length !== 3) return '';
+                return d[2] + '-' + d[1] + '-' + d[0] + 'T00:00:00';
+            }
 
-			// Remove raw date field from request
-			$dateInput.prop('disabled', true);
-		});
-	});
+            var dateFrom = toApiFormat(parts[0]);
+            var dateTo   = toApiFormat(parts[1]);
+
+            if (!dateFrom || !dateTo) {
+                alert('📅 Invalid date format');
+                $dateInput.focus();
+                return false;
+            }
+
+            $('#dateFrom').val(dateFrom);
+            $('#dateTo').val(dateTo);
+
+            // Disable visible date field so it doesn't get submitted
+            $dateInput.prop('disabled', true);
+
+            // ✅ finally submit the form
+            this.submit();
+        });
+
+    });
 
 })( jQuery );
 

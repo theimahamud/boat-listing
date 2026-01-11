@@ -20,7 +20,13 @@
 
         ?>
             <div class="boat-listing-filter-area" style="position:relative">
-                <div class="boat-lists-loader"><?php echo $preloader; ?></div>
+                <?php
+                // Check if dates are present to determine loader visibility
+                $dateFrom = isset($_GET['dateFrom']) && !empty($_GET['dateFrom']) ? $_GET['dateFrom'] : '';
+                $dateTo = isset($_GET['dateTo']) && !empty($_GET['dateTo']) ? $_GET['dateTo'] : '';
+                $showLoader = !empty($dateFrom) && !empty($dateTo);
+                ?>
+                <div class="boat-lists-loader" <?php echo $showLoader ? '' : 'style="display:none;"'; ?>><?php echo $preloader; ?></div>
 
                 <div class="boat-listing-filter-wraper">
                     <div class="filter-bar-area">
@@ -157,7 +163,17 @@
                     <div class="boat-listing-area">
                         <div class="boat-count-and-pagination">
                             <div id="boat-count" class="boat-count-message">
-                                <!-- boat count result show here -->
+                                <?php
+                                // Show initial message if no date parameters
+                                $dateFrom = isset($_GET['dateFrom']) && !empty($_GET['dateFrom']) ? $_GET['dateFrom'] : '';
+                                $dateTo = isset($_GET['dateTo']) && !empty($_GET['dateTo']) ? $_GET['dateTo'] : '';
+
+                                if (empty($dateFrom) || empty($dateTo)) {
+                                    echo 'Please select dates to search for boats';
+                                } else {
+                                    echo 'Loading boats...';
+                                }
+                                ?>
                             </div>
 
                             <div class="boat-listing-pagi">
@@ -166,7 +182,19 @@
                         </div>
                         
                         <div class="boat-lists">
-                            <!-- get boat list from ajax -->
+                            <?php
+                            // Check if date parameters exist in URL
+                            $dateFrom = isset($_GET['dateFrom']) && !empty($_GET['dateFrom']) ? $_GET['dateFrom'] : '';
+                            $dateTo = isset($_GET['dateTo']) && !empty($_GET['dateTo']) ? $_GET['dateTo'] : '';
+
+                            // If no date parameters found, show no boats message
+                            if (empty($dateFrom) || empty($dateTo)) {
+                                echo '<div class="no-boats-found" style="text-align:center; padding:40px;">';
+                                echo '<h3>📅 Please choose a date range to see available boats</h3>';
+                                echo '<p>Select your check-in and check-out dates from the filter above to see available boats.</p>';
+                                echo '</div>';
+                            }
+                            ?>
                         </div>
 
                         <div class="boat-listing-pagi">
@@ -230,6 +258,27 @@
         $productName = isset($_GET['productName']) && $_GET['productName'] ? sanitize_text_field($_GET['productName']) : '';
         $dateFrom = isset($_GET['dateFrom']) && $_GET['dateFrom'] ? $_GET['dateFrom'] : '';
         $dateTo = isset($_GET['dateTo']) && $_GET['dateTo'] ? $_GET['dateTo'] : '';
+
+        // 🚫 If no date range → DO NOT call API
+        if (empty($dateFrom) || empty($dateTo)) {
+
+            ob_start();
+            echo '<div class="no-boats-found" style="text-align:center; padding:40px;">';
+            echo '<h3>📅 Please choose a date range to see available boats</h3>';
+            echo '</div>';
+            $boats_html = ob_get_clean();
+
+            wp_send_json_success([
+                    'boats_html'      => $boats_html,
+                    'pagination_html' => '',
+                    'total_boats'     => 0,
+                    'has_date_filter' => false,
+                    'has_prices'      => false,
+                    'date_range'      => ''
+            ]);
+
+            wp_die();
+        }
 
         // Debug URL parameters
         error_log("🔍 URL Parameters:");

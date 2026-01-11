@@ -170,8 +170,31 @@ jQuery(document).ready(function($) {
         paged = paged || 1;
         source = source || 'auto';
 
-        // Build request parameters
+        // Check if dates are selected (required for API call)
         var urlParams = new URLSearchParams(window.location.search);
+        var dateFrom = urlParams.get('dateFrom');
+        var dateTo = urlParams.get('dateTo');
+
+        if (!dateFrom || !dateTo || dateFrom.trim() === '' || dateTo.trim() === '') {
+            console.log('📅 No date range selected, showing no boats message...');
+
+            // Hide loader immediately
+            $('.boat-lists-loader').hide();
+
+            $('.boat-lists').html(
+                '<div class="no-boats-found" style="text-align:center; padding:40px;">' +
+                '<h3>📅 Please choose a date range to see available boats</h3>' +
+                '<p>Select your check-in and check-out dates from the filter above to see available boats.</p>' +
+                '</div>'
+            );
+
+            $('#boat-count').html('Please select dates to search for boats');
+            $('.boat-listing-pagi').html('');
+
+            return; // Exit early - no API call without dates
+        }
+
+        // Build request parameters
         var ajaxData = {
             action: 'bl_get_paginated_boats',
             paged: paged,
@@ -504,15 +527,34 @@ jQuery(document).ready(function($) {
             // Clear hidden fields
             $('#dateFrom').val('');
             $('#dateTo').val('');
+
+            // Hide loader and show no boats message when dates are cleared
+            $('.boat-lists-loader').hide();
+            $('.boat-lists').html(
+                '<div class="no-boats-found" style="text-align:center; padding:40px;">' +
+                '<h3>📅 Please choose a date range to see available boats</h3>' +
+                '<p>Select your check-in and check-out dates from the filter above to see available boats.</p>' +
+                '</div>'
+            );
+            $('#boat-count').html('Please select dates to search for boats');
+            $('.boat-listing-pagi').html('');
         }
     });
 
-    // Auto-load if URL has parameters
+    // Auto-load boats only if both dateFrom and dateTo are present in URL
     var urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('country') || urlParams.get('productName') || urlParams.get('dateFrom')) {
+    var dateFrom = urlParams.get('dateFrom');
+    var dateTo = urlParams.get('dateTo');
+
+    if (dateFrom && dateTo && dateFrom.trim() !== '' && dateTo.trim() !== '') {
+        console.log('📅 Date parameters found in URL, auto-loading boats...');
         setTimeout(function() {
             loadBoatsAjax(1, 'auto');
         }, 300); // Reduced delay
+    } else {
+        console.log('📅 No date parameters found in URL, waiting for user to select dates...');
+        // Hide loader immediately on page load if no dates
+        $('.boat-lists-loader').hide();
     }
 
     // Clear cache button (add to admin area)

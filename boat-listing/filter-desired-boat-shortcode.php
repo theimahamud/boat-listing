@@ -39,8 +39,7 @@ function filter_desired_boat_shortcode() {
                     <?php if (!empty($priorityCountries)): ?>
                         <optgroup label="🌟 Popular Destinations">
                             <?php foreach ($priorityCountries as $country): ?>
-                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>"
-                                        <?php selected($country['country_data']['shortName'], $default_destination); ?>>
+                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>">
                                     <?php echo esc_html($country['country_data']['name']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -59,8 +58,7 @@ function filter_desired_boat_shortcode() {
                         ?>
                         <optgroup label="🌍 <?php echo esc_html($regionName); ?>">
                             <?php foreach ($regionCountries as $country): ?>
-                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>"
-                                        <?php selected($country['country_data']['shortName'], $default_destination); ?>>
+                                <option value="<?php echo esc_attr($country['country_data']['shortName']); ?>">
                                     <?php echo esc_html($country['country_data']['name']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -78,14 +76,15 @@ function filter_desired_boat_shortcode() {
                 <select name="productName" id="productName" class="boat-listing-select2"
                         style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white;">
                     <option value="">Choose Charter Type</option>
+
                     <?php foreach ($getBoatProductTypes as $productType): ?>
-                        <option value="<?php echo esc_attr($productType); ?>"
-                                <?php selected($productType, $default_product); ?>>
+                        <option value="<?php echo esc_attr($productType); ?>">
                             ⛵ <?php echo esc_html($productType); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
             </div>
+
 
             <!-- Date Range -->
             <div class="filter-fieldset" style="min-width: 250px;">
