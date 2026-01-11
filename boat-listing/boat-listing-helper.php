@@ -242,6 +242,63 @@ class Boat_Listing_Helper{
         return $results;
     }
 
+
+    /**
+     * Cached version of fetch_boat_offers
+     * Only uses cache if EXACT same filters are applied
+     */
+    public function fetch_boat_offers_cached($country, $productName, $dateFrom, $dateTo, $filters = []) {
+
+        // Build a unique cache key based on ALL filter parameters
+        $cache_params = [
+                'country' => $country,
+                'productName' => $productName,
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo,
+                'filters' => $filters
+        ];
+
+        // Sort filters array to ensure consistent cache keys
+        if (is_array($filters)) {
+            ksort($filters);
+        }
+
+        // Create unique hash from all parameters
+        $cache_key = 'bl_offers_' . md5(serialize($cache_params));
+
+        error_log("🔍 Cache Key: " . $cache_key);
+        error_log("🔍 Cache Params: " . json_encode($cache_params));
+
+        // Try to get from cache
+        $cached_data = get_transient($cache_key);
+
+        if ($cached_data !== false) {
+            error_log("✅ CACHE HIT! Using cached offers (exact same filters)");
+            error_log("📊 Cached offers count: " . count($cached_data));
+            return $cached_data;
+        }
+
+        error_log("❌ CACHE MISS - Making fresh API call");
+
+        // Not in cache or different filters - make API call
+        $offers = $this->fetch_boat_offers($country, $productName, $dateFrom, $dateTo, $filters);
+
+        // Only cache if we got valid results
+        if (!empty($offers) && is_array($offers)) {
+            // Cache for 15 minutes (900 seconds)
+            set_transient($cache_key, $offers, 15 * MINUTE_IN_SECONDS);
+            error_log("💾 Cached " . count($offers) . " offers for 15 minutes");
+        } else {
+            error_log("⚠️ Not caching - empty or invalid API response");
+        }
+
+        return $offers;
+    }
+
+    /**
+     * Updated boat_filters to use cached version
+     * Replace the fetch_boat_offers call with this
+     */
     public function boat_filters($country, $productName, $dateFrom, $dateTo, $paged = 1, $per_page = 10, $filters = []): array
     {
         global $wpdb;
@@ -270,9 +327,11 @@ class Boat_Listing_Helper{
             return $this->search_local_boats($filters, $per_page, $paged);
         }
 
-        // STEP 1: Fetch offers from API - THIS IS OUR SOURCE OF TRUTH
-        error_log("📡 Fetching offers from API...");
-        $offers = $this->fetch_boat_offers($country, $productName, $dateFrom, $dateTo, $filters);
+        // STEP 1: Fetch offers from API WITH CACHING - THIS IS OUR SOURCE OF TRUTH
+        error_log("📡 Fetching offers from API (with smart caching)...");
+
+        // Use cached version - only uses cache if EXACT same filters
+        $offers = $this->fetch_boat_offers_cached($country, $productName, $dateFrom, $dateTo, $filters);
 
         if (empty($offers) || !is_array($offers)) {
             error_log("❌ API returned no offers");
@@ -285,7 +344,7 @@ class Boat_Listing_Helper{
             ];
         }
 
-        error_log("✅ API returned " . count($offers) . " offers");
+        error_log("✅ Got " . count($offers) . " offers (cached or fresh API call)");
 
         // STEP 2: Extract unique yacht IDs from API offers - THESE ARE THE ONLY BOATS WE CAN SHOW
         $yacht_ids_from_api = array_unique(array_filter(array_map(function($offer) {
@@ -299,7 +358,6 @@ class Boat_Listing_Helper{
         error_log("📊 Found " . count($boats_map) . " matching boats in local database");
 
         // STEP 4: Match offers with local boat data and apply LOCAL filters
-        // IMPORTANT: We start with API offers and can only REDUCE, never INCREASE
         $boats = [];
         $filter_stats = [
                 'api_offers' => count($offers),
@@ -316,7 +374,6 @@ class Boat_Listing_Helper{
             $yacht_id = isset($offer['yachtId']) ? intval($offer['yachtId']) : 0;
 
             if (!$yacht_id || !isset($boats_map[$yacht_id])) {
-                error_log("⚠️ Yacht ID {$yacht_id} from API not found in local database");
                 continue;
             }
 
@@ -327,49 +384,45 @@ class Boat_Listing_Helper{
             // Apply LOCAL filters to reduce the API results
             $passed_all_filters = true;
 
-            // Charter type filter - Check if kind contains requested type
+            // Charter type filter
             if (!empty($filters['charter_type']) && !empty($data['kind'])) {
                 if (stripos($data['kind'], $filters['charter_type']) === false) {
-                    error_log("❌ Boat '{$boat_name}' (yacht ID: {$yacht_id}) filtered out by charter_type: '{$data['kind']}' doesn't contain '{$filters['charter_type']}'");
                     $filter_stats['filtered_by_charter_type']++;
                     $passed_all_filters = false;
                     continue;
                 }
             }
 
-            // Person filter - Exact match
+            // Person filter
             if (!empty($filters['person'])) {
                 $requested_person = intval($filters['person']);
                 $boat_max_people = intval($data['maxPeopleOnBoard'] ?? 0);
 
                 if ($boat_max_people != $requested_person) {
-                    error_log("❌ Boat '{$boat_name}' (yacht ID: {$yacht_id}) filtered out by person: {$boat_max_people} != {$requested_person}");
                     $filter_stats['filtered_by_person']++;
                     $passed_all_filters = false;
                     continue;
                 }
             }
 
-            // Year filter - Exact match
+            // Year filter
             if (!empty($filters['year'])) {
                 $requested_year = intval($filters['year']);
                 $boat_year = intval($data['year'] ?? 0);
 
                 if ($boat_year != $requested_year) {
-                    error_log("❌ Boat '{$boat_name}' (yacht ID: {$yacht_id}) filtered out by year: {$boat_year} != {$requested_year}");
                     $filter_stats['filtered_by_year']++;
                     $passed_all_filters = false;
                     continue;
                 }
             }
 
-            // Cabin filter - Exact match
+            // Cabin filter
             if (!empty($filters['cabin'])) {
                 $requested_cabins = intval($filters['cabin']);
                 $boat_cabins = intval($data['cabins'] ?? 0);
 
                 if ($boat_cabins != $requested_cabins) {
-                    error_log("❌ Boat '{$boat_name}' (yacht ID: {$yacht_id}) filtered out by cabin: {$boat_cabins} != {$requested_cabins}");
                     $filter_stats['filtered_by_cabin']++;
                     $passed_all_filters = false;
                     continue;
@@ -378,7 +431,6 @@ class Boat_Listing_Helper{
 
             // If passed all filters, add to results with offer data
             if ($passed_all_filters) {
-                error_log("✅ Boat '{$boat_name}' (yacht ID: {$yacht_id}) passed all filters");
                 $filter_stats['passed_all_filters']++;
 
                 // Merge offer data with boat data
@@ -426,6 +478,41 @@ class Boat_Listing_Helper{
                 'per_page'  => $per_page,
                 'total'     => $total,
                 'has_prices' => true
+        ];
+    }
+
+    /**
+     * Optional: Clear cache manually if needed
+     */
+    public function clear_offers_cache() {
+        global $wpdb;
+
+        // Delete all offer cache transients
+        $wpdb->query(
+                "DELETE FROM {$wpdb->options} 
+             WHERE option_name LIKE '_transient_bl_offers_%' 
+             OR option_name LIKE '_transient_timeout_bl_offers_%'"
+        );
+
+        error_log("🗑️ Cleared all offers cache");
+
+        return true;
+    }
+
+    /**
+     * Optional: Get cache statistics
+     */
+    public function get_cache_stats() {
+        global $wpdb;
+
+        $cache_count = $wpdb->get_var(
+                "SELECT COUNT(*) FROM {$wpdb->options} 
+             WHERE option_name LIKE '_transient_bl_offers_%'"
+        );
+
+        return [
+                'cached_searches' => $cache_count,
+                'cache_duration' => '15 minutes'
         ];
     }
 
