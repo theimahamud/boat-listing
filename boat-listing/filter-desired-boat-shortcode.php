@@ -14,10 +14,6 @@ function filter_desired_boat_shortcode() {
     $remainingCountries = $data['countries'];
     $priorityCountries  = $data['priority'] ?? [];
 
-    // ========== AUTO-SELECT DEFAULTS ==========
-    // Default selections (dates handled by flatpickr in JS)
-    $default_destination = 'VG'; // British Virgin Islands country code
-    $default_product = 'Crewed';
     // ==========================================
 
     ob_start();
@@ -33,10 +29,10 @@ function filter_desired_boat_shortcode() {
             <!-- Destination -->
             <div class="filter-fieldset" style="min-width: 280px;">
                 <label for="country" style="display: block; font-weight: 600; margin-bottom: 8px; color: #2c3e50; font-size: 16px;">
-                    <?php echo $icon['location']; ?> Destination <span style="color: #e74c3c;">*</span>
+                    <?php echo $icon['location']; ?> Destination
                 </label>
 
-                <select name="country" id="country" class="boat-listing-select2" required
+                <select name="country" id="country" class="boat-listing-select2"
                         style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white;">
                     <option value="">Choose Your Destination</option>
 
@@ -76,10 +72,10 @@ function filter_desired_boat_shortcode() {
             <!-- Charter Type / Product Name -->
             <div class="filter-fieldset" style="min-width: 220px;">
                 <label for="productName" style="display: block; font-weight: 600; margin-bottom: 8px; color: #2c3e50; font-size: 16px;">
-                    <?php echo $icon['category']; ?> Charter Type <span style="color: #e74c3c;">*</span>
+                    <?php echo $icon['category']; ?> Charter Type
                 </label>
 
-                <select name="productName" id="productName" class="boat-listing-select2" required
+                <select name="productName" id="productName" class="boat-listing-select2"
                         style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white;">
                     <option value="">Choose Charter Type</option>
                     <?php foreach ($getBoatProductTypes as $productType): ?>
@@ -94,11 +90,11 @@ function filter_desired_boat_shortcode() {
             <!-- Date Range -->
             <div class="filter-fieldset" style="min-width: 250px;">
                 <label for="dateRange" style="display: block; font-weight: 600; margin-bottom: 8px; color: #2c3e50; font-size: 16px;">
-                    <?php echo $icon['date']; ?> Travel Dates <span style="color: #e74c3c;">*</span>
+                    <?php echo $icon['date']; ?> Travel Dates
                 </label>
                 <input type="text" id="dateRange" name="dateRange"
                        placeholder="Select your travel dates"
-                       autocomplete="off" required
+                       autocomplete="off"
                        style="width: 100%; padding: 15px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white;"
                        class="boat-listing-input-text bl-home-date-range-picker" />
             </div>
@@ -163,20 +159,6 @@ function filter_desired_boat_shortcode() {
             var urlParams = new URLSearchParams(window.location.search);
             var hasExistingParams = urlParams.get('country') || urlParams.get('productName') || urlParams.get('dateFrom');
 
-            if (!hasExistingParams) {
-                // console.log('Setting defaults: British Virgin Islands, Crewed');
-                // console.log('Dates will be auto-set by flatpickr (tomorrow + 7 days)');
-
-                // Set destination to British Virgin Islands
-                $('#country').val(<?php echo json_encode($default_destination); ?>).trigger('change');
-
-                // Set product to Crewed
-                $('#productName').val(<?php echo json_encode($default_product); ?>).trigger('change');
-
-                // Dates are handled by flatpickr (see flatpickr configuration)
-            } else {
-                // console.log('User returned from filter page - preserving their selections');
-            }
             // =======================================================
 
             // Simple form submission - only essential parameters

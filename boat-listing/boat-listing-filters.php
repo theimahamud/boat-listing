@@ -29,7 +29,7 @@
                             <div class="filter-fieldset">
                                 <label for="charterType"><?php echo $icon['charter_type']; ?> Charter Type</label>
                                 <select name="charterType" id="charterType" class="boat-listing-select2">
-                                    <option value="">Select Charter Type </option>
+                                    <option value="">Choose Charter Type</option>
                                     <?php foreach ($charterTypes as $category): ?>
                                         <option value="<?php echo esc_attr($category['name']); ?>">
                                             <?php echo esc_html($category['name']); ?>
@@ -51,7 +51,7 @@
                             <div class="filter-fieldset">
                                 <label for="country"><?php echo $icon['location']; ?> Destinations</label>
                                 <select name="country" id="country" class="boat-listing-select2">
-                                    <option value="">All Destinations</option>
+                                    <option value="">Choose Your Destinations</option>
                                     <?php if (!empty($priorityCountries)): ?>
                                         <optgroup label="Popular Destinations">
                                             <?php foreach ($priorityCountries as $country): ?>
