@@ -164,6 +164,51 @@
 			}
 		});
 
+		// 🏠 Filter Desired Boat shortcode date picker - Auto-select tomorrow + 7 days (same as home page)
+		flatpickr(".bl-filter-desired-date-range-picker", {
+			mode: "range",
+			minDate: "today",
+			dateFormat: "d.m.Y",
+
+			// Auto-select tomorrow + 7 days
+			defaultDate: [
+				new Date(new Date().setDate(new Date().getDate() + 1)), // Tomorrow
+				new Date(new Date().setDate(new Date().getDate() + 8))  // Tomorrow + 7 days
+			],
+
+			disable: [
+				function (date) {
+					return !(date.getDate() % 360);
+				}
+			],
+
+			onReady: function (selectedDates, dateStr, instance) {
+				instance.calendarContainer.classList.add('boat-listing-date-range');
+
+				// Format and display the auto-selected dates
+				if (selectedDates.length === 2) {
+					var fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
+					var toDate = instance.formatDate(selectedDates[1], "d.m.Y");
+					instance.input.value = fromDate + " to " + toDate;
+				}
+			},
+
+			onChange: function (selectedDates, dateStr, instance) {
+				// Only when full range is selected
+				if (selectedDates.length === 2) {
+					var fromDate = instance.formatDate(selectedDates[0], "d.m.Y");
+					var toDate = instance.formatDate(selectedDates[1], "d.m.Y");
+
+					instance.input.value = fromDate + " to " + toDate;
+
+					// Trigger change event for form handling
+					$(instance.input).trigger("change");
+				} else {
+					instance.input.value = "";
+				}
+			}
+		});
+
         $('#filter-desired-boat-form').on('submit', function (e) {
             e.preventDefault(); // stop form submission first
 

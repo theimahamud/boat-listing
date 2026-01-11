@@ -13,7 +13,7 @@ class boat_listing_models extends \ElementorPro\Modules\Forms\Fields\Field_Base 
         add_action( 'elementor/preview/init', [ $this, 'editor_preview_footer' ] );
 
         $helper = new Boat_Listing_Helper();
-        $this->models = $helper->fetch_all_models(); // store for later
+       // $this->models = $helper->fetch_all_models(); // store for later
     }
 
     public function get_type() {

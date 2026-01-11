@@ -33,14 +33,6 @@ class Boat_Listing_Activator {
 	public static function activate() {
 
 		self::create_table();
-		//self::insert_all_boats();
-		// self::insert_companies();
-		// self::insert_category();
-		// self::insert_models();
-		// self::insert_locaitons();
-		// self::insert_charterbases();
-		// self::insert_freeyacht();
-
 	}
 
 	public static function cread(){
@@ -53,8 +45,6 @@ class Boat_Listing_Activator {
 		global $wpdb;
 
 		$boat_table = $wpdb->prefix . 'boats';
-		$free_boat_table = $wpdb->prefix . 'boat_free';
-		$models = $wpdb->prefix . 'boat_models';
 		$company_table = $wpdb->prefix . 'boat_companies';
 		$boat_category = $wpdb->prefix . 'boat_category';
 		$location_table = $wpdb->prefix . 'boat_locations';
@@ -63,7 +53,6 @@ class Boat_Listing_Activator {
         $boat_country_table = $wpdb->prefix . 'boat_country';
         $boat_countrystate_table = $wpdb->prefix . 'boat_country_state';
         $boat_regions_table = $wpdb->prefix . 'boat_regions';
-        $boat_price_list_table = $wpdb->prefix . 'boat_price_list';
         $yacht_availability_table = $wpdb->prefix . 'yacht_availability';
 		$charset_collate = $wpdb->get_charset_collate();
 
@@ -96,13 +85,6 @@ class Boat_Listing_Activator {
 
 		dbDelta($boat_regions);
 
-		$boat_free = "CREATE TABLE $free_boat_table (
-			id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
-			free_data LONGTEXT NOT NULL
-		) $charset_collate;";
-
-		dbDelta($boat_free);
-
         $sql = "CREATE TABLE $yacht_availability_table (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             yacht_id BIGINT(20) UNSIGNED NOT NULL,
@@ -116,13 +98,6 @@ class Boat_Listing_Activator {
             KEY idx_year (year)
         ) $charset_collate;";
         dbDelta($sql);
-
-		$sql2 = "CREATE TABLE $models (
-			id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
-			model_data LONGTEXT NOT NULL
-		) $charset_collate;";
-
-		dbDelta($sql2);
 
         $company = "CREATE TABLE $company_table (
             id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
@@ -151,13 +126,6 @@ class Boat_Listing_Activator {
 		) $charset_collate;";
 
 		dbDelta($charterbases);
-
-		$boat_price_list = "CREATE TABLE $boat_price_list_table (
-			id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
-			price_data LONGTEXT NOT NULL
-		) $charset_collate;";
-
-		dbDelta($boat_price_list);
 
 		$book_reserve = "CREATE TABLE $book_reserve_table (
 			id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,

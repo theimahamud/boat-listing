@@ -13,16 +13,6 @@ function render_single_boat_by_query() {
     $cabin = sanitize_text_field($_GET['cabin'] ?? '');
     $year = sanitize_text_field($_GET['year'] ?? '');
     $person = sanitize_text_field($_GET['person'] ?? '');
-    $berths = sanitize_text_field($_GET['berths'] ?? '');
-    $wc = sanitize_text_field($_GET['wc'] ?? '');
-    $minLength = sanitize_text_field($_GET['minLength'] ?? '');
-    $maxLength = sanitize_text_field($_GET['maxLength'] ?? '');
-    $companyId = sanitize_text_field($_GET['companyId'] ?? '');
-    $baseFromId = sanitize_text_field($_GET['baseFromId'] ?? '');
-    $baseToId = sanitize_text_field($_GET['baseToId'] ?? '');
-    $sailingAreaId = sanitize_text_field($_GET['sailingAreaId'] ?? '');
-    $modelId = sanitize_text_field($_GET['modelId'] ?? '');
-    $flexibility = sanitize_text_field($_GET['flexibility'] ?? '');
 
     $default_date_from = $current_year . '-01-01T00:00:00';
     $default_date_to = $current_year . '-12-31T00:00:00';
@@ -46,17 +36,6 @@ function render_single_boat_by_query() {
             'person' => $person,
             'cabin' => $cabin,
             'year' => $year,
-            'berths' => $berths,
-            'wc' => $wc,
-            'minLength' => $minLength,
-            'maxLength' => $maxLength,
-            'companyId' => $companyId,
-            'baseFromId' => $baseFromId,
-            'baseToId' => $baseToId,
-            'sailingAreaId' => $sailingAreaId,
-            'modelId' => $modelId,
-            'flexibility' => $flexibility,
-            'yachtId' => [$boat_id],
     ];
 
     // Remove empty values but keep meaningful zeros and arrays
@@ -64,38 +43,8 @@ function render_single_boat_by_query() {
         return $value !== '' && $value !== null && (!is_array($value) || !empty($value));
     });
 
-    // ========== CRITICAL CACHE #1: BOAT DATA (24 HOURS) ==========
-    $cache_key_boat = 'bl_boat_' . $boat_id;
-    $boat_data = get_transient($cache_key_boat);
-
-    if ($boat_data === false) {
-        error_log("🔍 Cache MISS for boat: {$boat_id}");
-        $boat_data = $helper->fetch_all_boats($boat_id);
-
-        if (!empty($boat_data)) {
-            set_transient($cache_key_boat, $boat_data, DAY_IN_SECONDS);
-            error_log("💾 Cached boat data: {$boat_id}");
-        }
-    } else {
-        error_log("✅ Cache HIT for boat: {$boat_id}");
-    }
-    // ============================================================
-
-    // ========== CRITICAL CACHE #2: PRICE DATA (1 HOUR) ==========
-    $cache_key_price = 'bl_price_' . md5($boat_id . $date_from . $date_to . serialize($filters_for_api));
-    $prices = get_transient($cache_key_price);
-
-    if ($prices === false) {
-        error_log("🔍 Cache MISS for prices: boat {$boat_id}");
-        $prices = $helper->get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters_for_api);
-
-        if (!empty($prices)) {
-            set_transient($cache_key_price, $prices, HOUR_IN_SECONDS);
-            error_log("💾 Cached price data: {$boat_id}");
-        }
-    } else {
-        error_log("✅ Cache HIT for prices: boat {$boat_id}");
-    }
+    $boat_data = $helper->fetch_all_boats($boat_id);
+    $prices = $helper->get_single_yacht_offer_details($boat_id, $date_from, $date_to, $filters_for_api);
     // ============================================================
 
     if (empty($boat_id)) {
@@ -112,24 +61,6 @@ function render_single_boat_by_query() {
     if (empty($data)) {
         return '<p>Invalid boat data.</p>';
     }
-
-    // Build back to results URL with all current filter parameters
-    $back_params = [];
-
-    $filter_params = [
-            'country', 'productName', 'charterType', 'person', 'cabin', 'year',
-            'berths', 'wc', 'minLength', 'maxLength', 'companyId', 'baseFromId',
-            'baseToId', 'sailingAreaId', 'modelId', 'flexibility', 'dateFrom', 'dateTo'
-    ];
-
-    foreach ($filter_params as $param) {
-        if (!empty($_GET[$param])) {
-            $back_params[] = $param . '=' . urlencode($_GET[$param]);
-        }
-    }
-
-    $back_url = site_url('/boat-filter' . (!empty($back_params) ? '?' . implode('&', $back_params) : ''));
-    $show_back_button = !empty($back_params);
 
     ob_start();
     ?>
@@ -341,25 +272,25 @@ function render_single_boat_by_query() {
                         <tr>
                             <th>From</th>
                             <th>To</th>
+                            <th>Start Location</th>
+                            <th>End Location</th>
                             <th>Price</th>
                             <th>Currency</th>
                         </tr>
 
                         <?php foreach ($prices['rows'] as $row): ?>
                             <tr>
-                                <td>
-                                    <?php echo esc_html(date('Y-m-d', strtotime($row['dateFrom']))); ?>
-                                </td>
-                                <td>
-                                    <?php echo esc_html(date('Y-m-d', strtotime($row['dateTo']))); ?>
-                                </td>
-                                <td><?php echo esc_html(number_format($row['totalPrice'] ?? $row['price'], 2)); ?></td>
+                                <td><?php echo esc_html(date('Y-m-d', strtotime($row['dateFrom']))); ?></td>
+                                <td><?php echo esc_html(date('Y-m-d', strtotime($row['dateTo']))); ?></td>
+                                <td><?php echo esc_html($row['startBase']); ?></td>
+                                <td><?php echo esc_html($row['endBase']); ?></td>
+                                <td><?php echo esc_html(number_format($row['startPrice'], 2)); ?></td>
                                 <td><?php echo esc_html($row['currency']); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </table>
                 <?php else: ?>
-                    <p>Price not available</p>
+                    <p>Price not available for the selected dates. Please try different dates or contact us for pricing.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -369,61 +300,6 @@ function render_single_boat_by_query() {
     // This shortcode for booking modal
     echo do_shortcode('[book_now_modal_shortcode]');
     ?>
-
-    <?php if ($show_back_button): ?>
-        <!-- Enhanced navigation JavaScript for details page -->
-        <script>
-            jQuery(document).ready(function($) {
-
-                // Handle browser back button to go to filter page if came from there
-                var referrer = document.referrer;
-                if (referrer && referrer.includes('/boat-filter')) {
-                    // User came from filter page - enhance back button behavior
-                    console.log('🔍 User came from filter page, enhancing navigation');
-
-                    // Handle browser back button
-                    window.addEventListener('popstate', function(event) {
-                        if (referrer.includes('/boat-filter')) {
-                            window.location.href = '<?php echo esc_js($back_url); ?>';
-                        }
-                    });
-
-                    // Add keyboard shortcut (Escape key) for quick back navigation
-                    $(document).keydown(function(e) {
-                        if (e.keyCode === 27) { // Escape key
-                            window.location.href = '<?php echo esc_js($back_url); ?>';
-                        }
-                    });
-
-                    // Add visual feedback for back button
-                    $('.back-to-results a').on('click', function() {
-                        $(this).css('opacity', '0.7');
-                        console.log('🔙 Navigating back to search results with filters preserved');
-                    });
-                }
-
-                // Log filter parameters being preserved for debugging
-                var urlParams = new URLSearchParams(window.location.search);
-                var filterParams = [];
-                var preservedParams = ['country', 'productName', 'charterType', 'person', 'cabin', 'year', 'dateFrom', 'dateTo'];
-
-                preservedParams.forEach(function(param) {
-                    if (urlParams.get(param)) {
-                        filterParams.push(param + '=' + urlParams.get(param));
-                    }
-                });
-
-                if (filterParams.length > 0) {
-                    console.log('🔗 Details page loaded with filter parameters:', filterParams.join('&'));
-                }
-
-                // Log cache performance
-                console.log('⚡ Cache Status - Boat: <?php echo ($boat_data !== false) ? "HIT" : "MISS"; ?>, Price: <?php echo ($prices !== false) ? "HIT" : "MISS"; ?>');
-
-            });
-        </script>
-    <?php endif; ?>
-
     <?php
 
     return ob_get_clean();
@@ -432,26 +308,26 @@ function render_single_boat_by_query() {
 /**
  * AJAX handler to clear details page cache
  */
-add_action('wp_ajax_bl_clear_details_cache', 'bl_clear_details_cache_handler');
-add_action('wp_ajax_nopriv_bl_clear_details_cache', 'bl_clear_details_cache_handler');
+//add_action('wp_ajax_bl_clear_details_cache', 'bl_clear_details_cache_handler');
+//add_action('wp_ajax_nopriv_bl_clear_details_cache', 'bl_clear_details_cache_handler');
 
-function bl_clear_details_cache_handler() {
-    $boat_id = sanitize_text_field($_POST['boat_id'] ?? '');
-
-    if ($boat_id) {
-        delete_transient('bl_boat_' . $boat_id);
-
-        // Clear all price caches for this boat
-        global $wpdb;
-        $wpdb->query(
-                $wpdb->prepare(
-                        "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
-                        '%_transient_bl_price_' . md5($boat_id . '%') . '%'
-                )
-        );
-
-        wp_send_json_success(['message' => 'Cache cleared for boat ' . $boat_id]);
-    } else {
-        wp_send_json_error(['message' => 'No boat ID provided']);
-    }
-}
+//function bl_clear_details_cache_handler() {
+//    $boat_id = sanitize_text_field($_POST['boat_id'] ?? '');
+//
+//    if ($boat_id) {
+//        delete_transient('bl_boat_' . $boat_id);
+//
+//        // Clear all price caches for this boat
+//        global $wpdb;
+//        $wpdb->query(
+//                $wpdb->prepare(
+//                        "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+//                        '%_transient_bl_price_' . md5($boat_id . '%') . '%'
+//                )
+//        );
+//
+//        wp_send_json_success(['message' => 'Cache cleared for boat ' . $boat_id]);
+//    } else {
+//        wp_send_json_error(['message' => 'No boat ID provided']);
+//    }
+//}
