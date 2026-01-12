@@ -1,11 +1,8 @@
 <?php
 
-
 add_action('wp_ajax_bl_sync_boat_company', 'bl_sync_boat_company');
 
 function bl_sync_boat_company() {
-
-    //check_ajax_referer('bl_sync_nonce', 'nonce');
 
     if (!current_user_can('manage_options')) {
         wp_send_json_error(['message' => 'Unauthorized']);
@@ -30,40 +27,6 @@ function bl_sync_boat_company() {
         'message' => 'Sync Successful.',
         'results' => $results,
     ]);
-
-}
-
-
-add_action('wp_ajax_bl_sync_freeyacht', 'bl_sync_freeyacht');
-
-function bl_sync_freeyacht() {
-
-    //check_ajax_referer('bl_sync_nonce', 'nonce');
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'Unauthorized']);
-    }
-
-    // Call the fetch & insert function
-    require_once plugin_dir_path(__FILE__) . 'class-boat-listing-activator.php'; // adjust path as needed
-
-    global $wpdb;
-
-    $results = [];
-
-    // Sync Companies
-    $companies_synced = Boat_Listing_Activator::insert_freeyacht();
-    $results['freeyacht'] = [
-        'status' => $companies_synced ? 'success' : 'failed',
-        'count'  => $companies_synced ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}boat_free") : 0,
-    ];
-
-      // Final response
-    wp_send_json_success([
-        'message' => 'Sync Successful.',
-        'results' => $results,
-    ]);
-
 }
 
 /**
@@ -95,86 +58,12 @@ add_action('wp_ajax_bl_start_boat_sync', function () {
     ]);
 });
 
-
-/**
- * Sync Boat Models
- */
-
-add_action('wp_ajax_bl_sync_boat_models', 'bl_sync_boat_models');
-
-function bl_sync_boat_models() {
-
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'Unauthorized']);
-    }
-
-    // Call the fetch & insert function
-    require_once plugin_dir_path(__FILE__) . 'class-boat-listing-activator.php'; // adjust path as needed
-
-    global $wpdb;
-
-    $results = [];
-
-
-    //Sync models
-    $models_synced = Boat_Listing_Activator::insert_models();
-    $results['models'] = [
-        'status' => $models_synced ? 'success' : 'failed',
-        'count'  => $models_synced ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}boat_models") : 0,
-    ];
-
-      // Final response
-    wp_send_json_success([
-        'message' => 'Models Sync Successful.',
-        'results' => $results,
-    ]);
-
-}
-
-/**
- * Sync Boat Price Lists
- */
-
-add_action('wp_ajax_bl_sync_boat_price_lists', 'bl_sync_boat_price_lists');
-
-function bl_sync_boat_price_lists() {
-
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'Unauthorized']);
-    }
-
-    // Call the fetch & insert function
-    require_once plugin_dir_path(__FILE__) . 'class-boat-listing-activator.php'; // adjust path as needed
-
-    global $wpdb;
-
-    $results = [];
-
-
-    //Sync models
-    $synced = Boat_Listing_Activator::insert_price_list();
-    $results['price_lists'] = [
-        'status' => $synced ? 'success' : 'failed',
-        'count'  => $synced ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}boat_price_list") : 0,
-    ];
-
-      // Final response
-    wp_send_json_success([
-        'message' => 'Price Lists Sync Successful.',
-        'results' => $results,
-    ]);
-
-}
-
 /**
  * Sync Boat Category
  */
 add_action('wp_ajax_bl_sync_boat_category', 'bl_sync_boat_category');
 
 function bl_sync_boat_category() {
-
 
     if (!current_user_can('manage_options')) {
         wp_send_json_error(['message' => 'Unauthorized']);
@@ -210,7 +99,6 @@ add_action('wp_ajax_bl_sync_boat_country', 'bl_sync_boat_country');
 
 function bl_sync_boat_country() {
 
-
     if (!current_user_can('manage_options')) {
         wp_send_json_error(['message' => 'Unauthorized']);
     }
@@ -221,7 +109,6 @@ function bl_sync_boat_country() {
     global $wpdb;
 
     $results = [];
-
 
      // Sync country
     $synced = Boat_Listing_Activator::insert_country();
@@ -235,44 +122,6 @@ function bl_sync_boat_country() {
         'message' => 'Countries Sync Successful.',
         'results' => $results,
     ]);
-
-}
-
-
-/**
- * Sync Boat country state
- */
-
-add_action('wp_ajax_bl_sync_boat_country_state', 'bl_sync_boat_country_state');
-
-function bl_sync_boat_country_state() {
-
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'Unauthorized']);
-    }
-
-    // Call the fetch & insert function
-    require_once plugin_dir_path(__FILE__) . 'class-boat-listing-activator.php'; // adjust path as needed
-
-    global $wpdb;
-
-    $results = [];
-
-
-     // Sync country state
-    $synced = Boat_Listing_Activator::insert_country_state();
-    $results['country_state'] = [
-        'status' => $synced ? 'success' : 'failed',
-        'count'  => $synced ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}boat_country_state") : 0,
-    ];
-
-      // Final response
-    wp_send_json_success([
-        'message' => 'Country states Sync Successful.',
-        'results' => $results,
-    ]);
-
 }
 
 /**
@@ -283,7 +132,6 @@ add_action('wp_ajax_bl_sync_boat_regions', 'bl_sync_boat_regions');
 
 function bl_sync_boat_regions() {
 
-
     if (!current_user_can('manage_options')) {
         wp_send_json_error(['message' => 'Unauthorized']);
     }
@@ -294,7 +142,6 @@ function bl_sync_boat_regions() {
     global $wpdb;
 
     $results = [];
-
 
      // Sync regions
     $synced = Boat_Listing_Activator::insert_regions();
@@ -308,43 +155,6 @@ function bl_sync_boat_regions() {
         'message' => 'Regions Sync Successful.',
         'results' => $results,
     ]);
-
-}
-
-/**
- * Sync Boat Locations
- */
-
-add_action('wp_ajax_bl_sync_boat_locations', 'bl_sync_boat_locations');
-
-function bl_sync_boat_locations() {
-
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'Unauthorized']);
-    }
-
-    // Call the fetch & insert function
-    require_once plugin_dir_path(__FILE__) . 'class-boat-listing-activator.php'; // adjust path as needed
-
-    global $wpdb;
-
-    $results = [];
-
-
-     // Sync locations
-    $location_synced = Boat_Listing_Activator::insert_locaitons();
-    $results['locations'] = [
-        'status' => $location_synced ? 'success' : 'failed',
-        'count'  => $location_synced ? (int) $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}boat_locations") : 0,
-    ];
-
-      // Final response
-    wp_send_json_success([
-        'message' => 'Locations Sync Successful.',
-        'results' => $results,
-    ]);
-
 }
 
 /**
@@ -354,7 +164,6 @@ function bl_sync_boat_locations() {
 add_action('wp_ajax_bl_sync_boat_charterbase', 'bl_sync_boat_charterbase');
 
 function bl_sync_boat_charterbase() {
-
 
     if (!current_user_can('manage_options')) {
         wp_send_json_error(['message' => 'Unauthorized']);
@@ -485,8 +294,6 @@ function bl_load_booking_modal() {
     </div>
 
     <?php
-
-    
 
     wp_die();
 }

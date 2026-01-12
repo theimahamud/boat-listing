@@ -50,7 +50,6 @@ class Boat_Listing_Activator {
 		$charterbase_table = $wpdb->prefix . 'boat_charterbaese';
 		$book_reserve_table = $wpdb->prefix . 'boat_book_request';
         $boat_country_table = $wpdb->prefix . 'boat_country';
-        $boat_countrystate_table = $wpdb->prefix . 'boat_country_state';
         $boat_regions_table = $wpdb->prefix . 'boat_regions';
         $yacht_availability_table = $wpdb->prefix . 'yacht_availability';
 		$charset_collate = $wpdb->get_charset_collate();
@@ -69,13 +68,6 @@ class Boat_Listing_Activator {
 		) $charset_collate;";
 
 		dbDelta($boat_country);
-
-		$boat_countrystate = "CREATE TABLE $boat_countrystate_table (
-			id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
-            country_state_data LONGTEXT NOT NULL
-		) $charset_collate;";
-
-		dbDelta($boat_countrystate);
 
 		$boat_regions = "CREATE TABLE $boat_regions_table (
 			id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
