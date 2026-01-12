@@ -22,7 +22,6 @@
  * @author     Design Develop Zone <kawsarr575@gmail.com>
  */
 class Boat_Listing_Activator {
-
 	/**
 	 * Short Description. (use period)
 	 *
@@ -52,6 +51,7 @@ class Boat_Listing_Activator {
         $boat_country_table = $wpdb->prefix . 'boat_country';
         $boat_regions_table = $wpdb->prefix . 'boat_regions';
         $yacht_availability_table = $wpdb->prefix . 'yacht_availability';
+        $boat_sync_queue_table = $wpdb->prefix . 'boat_sync_queue';
 		$charset_collate = $wpdb->get_charset_collate();
 
 		require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
@@ -87,6 +87,18 @@ class Boat_Listing_Activator {
             UNIQUE KEY yacht_year (yacht_id, year),
             KEY idx_yacht (yacht_id),
             KEY idx_year (year)
+        ) $charset_collate;";
+        dbDelta($sql);
+
+        $sql = "CREATE TABLE $boat_sync_queue_table (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            yacht_id BIGINT(20) UNSIGNED NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            last_error TEXT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY yacht_id (yacht_id),
+            KEY status (status)
         ) $charset_collate;";
         dbDelta($sql);
 
@@ -170,7 +182,6 @@ class Boat_Listing_Activator {
         return $datas ?? [];
     }
 
-
     public static function insert_regions() {
 
         global $wpdb;
@@ -251,165 +262,6 @@ class Boat_Listing_Activator {
         return $datas ?? [];
     }
 
-    /**
-     * Cron entry point to sync boats company-wise
-     */
-    public static function process_boat_sync() {
-        global $wpdb;
-
-        error_log('✅ bl_boat_sync_cron fired');
-
-        // Prevent overlapping cron runs
-        if (get_transient('bl_boat_sync_lock')) {
-            return;
-        }
-        set_transient('bl_boat_sync_lock', 1, 300); // lock 5 min
-
-        // Fetch all available yacht IDs
-        $yacht_ids = $wpdb->get_col("SELECT yacht_id FROM {$wpdb->prefix}yacht_availability");
-
-        if (empty($yacht_ids)) {
-            wp_clear_scheduled_hook('bl_boat_sync_cron');
-            delete_transient('bl_boat_sync_lock');
-            error_log('🎉 No yachts available. Cron stopped.');
-            return;
-        }
-
-        // Process each yacht ID
-        foreach ($yacht_ids as $yacht_id) {
-            $result = self::insert_boat_by_yacht_id($yacht_id); // call same insert_boats method
-
-            // Log result in the same way
-            if ($result['error']) {
-                error_log("❌ Yacht {$yacht_id} sync failed: {$result['error']}");
-            } else {
-                error_log("✅ Yacht {$yacht_id} synced successfully ({$result['inserted']} inserted).");
-            }
-        }
-
-        delete_transient('bl_boat_sync_lock');
-    }
-
-
-    /**
-     * Insert boats for a company from API
-     */
-    /**
-     * Insert or update boat by yacht ID
-     */
-    public static function insert_boat_by_yacht_id($yacht_id) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'boats';
-        $url   = "https://www.booking-manager.com/api/v2/yacht/{$yacht_id}";
-
-        try {
-            $ch = curl_init($url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "accept: application/json",
-                "Authorization: Bearer " . self::cread(),
-            ]);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
-
-            $response  = curl_exec($ch);
-            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($http_code !== 200 || !$response) {
-                return ['inserted' => 0, 'error' => "API error {$http_code}"];
-            }
-
-            $boat = json_decode($response, true);
-            if (empty($boat) || !is_array($boat)) {
-                return ['inserted' => 0, 'error' => 'Empty or invalid API response'];
-            }
-
-            $products = $boat['products'] ?? [];
-
-            $filtered_products = [];
-
-            if (is_array($products)) {
-                foreach ($products as $product) {
-                    $filtered_products[] = [
-                        'name'              => $product['name'] ?? '',
-                    ];
-                }
-            }
-
-            // Duplicate check
-            $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE id = %d", $yacht_id));
-            if ($exists) return ['inserted' => 0, 'error' => null];
-
-            $filtered = [
-                'id'                => $yacht_id,
-                'name'              => $boat['name'] ?? '',
-                'model'             => $boat['model'] ?? '',
-                'modelId'           => $boat['modelId'] ?? null,
-
-                // Company & location
-                'companyId'         => $boat['companyId'] ?? null,
-                'company'           => $boat['company'] ?? '',
-                'homeBaseId'        => $boat['homeBaseId'] ?? null,
-                'homeBase'          => $boat['homeBase'] ?? '',
-
-                // Yacht details
-                'year'              => $boat['year'] ?? null,
-                'yearNote'          => $boat['yearNote'] ?? '',
-                'kind'              => $boat['kind'] ?? '',
-                'length'            => $boat['length'] ?? null,
-                'beam'              => $boat['beam'] ?? null,
-                'draught'           => $boat['draught'] ?? null,
-
-                // Capacities
-                'cabins'            => $boat['cabins'] ?? null,
-                'berths'            => $boat['berths'] ?? null,
-                'wc'                => $boat['wc'] ?? null,
-                'maxPeopleOnBoard'  => $boat['maxPeopleOnBoard'] ?? $boat['berths'] ?? 0,
-
-                // Technical
-                'engine'            => $boat['engine'] ?? '',
-                'fuelCapacity'      => $boat['fuelCapacity'] ?? null,
-                'waterCapacity'     => $boat['waterCapacity'] ?? null,
-
-                // Money
-                'currency'          => $boat['currency'] ?? 'EUR',
-                'deposit'           => $boat['deposit'] ?? 0,
-                'depositWithWaiver' => $boat['depositWithWaiver'] ?? 0,
-                'commissionPercentage' => $boat['commissionPercentage'] ?? 0,
-                'maxDiscountFromCommissionPercentage'
-                => $boat['maxDiscountFromCommissionPercentage'] ?? 0,
-
-                // Charter rules
-                'defaultCheckInTime'  => $boat['defaultCheckInTime'] ?? '',
-                'defaultCheckOutTime' => $boat['defaultCheckOutTime'] ?? '',
-                'defaultCheckInDay'   => $boat['defaultCheckInDay'] ?? null,
-                'allCheckInDays'      => $boat['allCheckInDays'] ?? [],
-                'minimumCharterDuration' => $boat['minimumCharterDuration'] ?? 0,
-                'maximumCharterDuration' => $boat['maximumCharterDuration'] ?? 0,
-
-                // Media
-                'images'            => $boat['images'] ?? [],
-
-                //Products
-                'products'            => $filtered_products ?? [],
-            ];
-
-            $wpdb->insert($table, [
-                'id'   => $yacht_id,
-                'data' => wp_json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-            ]);
-
-            return ['inserted' => 1, 'error' => null];
-
-        } catch (\Throwable $e) {
-            return ['inserted' => 0, 'error' => $e->getMessage()];
-        }
-    }
-
-    /**
-     * Insert Category
-     */
     public static function insert_category() {
 
         global $wpdb;
@@ -541,5 +393,151 @@ class Boat_Listing_Activator {
 
         delete_transient('bl_availability_lock');
         error_log('✅ Daily yacht availability sync finished');
+    }
+
+    public static function process_boat_sync() {
+        global $wpdb;
+
+        error_log('✅ bl_boat_sync_cron fired');
+
+        // Prevent overlapping cron runs
+        if (get_transient('bl_boat_sync_lock')) {
+            return;
+        }
+        set_transient('bl_boat_sync_lock', 1, 300); // lock 5 min
+
+        // Fetch all available yacht IDs
+        $yacht_ids = $wpdb->get_col("SELECT yacht_id FROM {$wpdb->prefix}yacht_availability");
+
+        if (empty($yacht_ids)) {
+            wp_clear_scheduled_hook('bl_boat_sync_cron');
+            delete_transient('bl_boat_sync_lock');
+            error_log('🎉 No yachts available. Cron stopped.');
+            return;
+        }
+
+        // Process each yacht ID
+        foreach ($yacht_ids as $yacht_id) {
+            $result = self::insert_boat_by_yacht_id($yacht_id); // call same insert_boats method
+
+            // Log result in the same way
+            if ($result['error']) {
+                error_log("❌ Yacht {$yacht_id} sync failed: {$result['error']}");
+            } else {
+                error_log("✅ Yacht {$yacht_id} synced successfully ({$result['inserted']} inserted).");
+            }
+        }
+
+        delete_transient('bl_boat_sync_lock');
+    }
+
+    public static function insert_boat_by_yacht_id($yacht_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'boats';
+        $url   = "https://www.booking-manager.com/api/v2/yacht/{$yacht_id}";
+
+        try {
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "accept: application/json",
+                "Authorization: Bearer " . self::cread(),
+            ]);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+
+            $response  = curl_exec($ch);
+            $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($http_code !== 200 || !$response) {
+                return ['inserted' => 0, 'error' => "API error {$http_code}"];
+            }
+
+            $boat = json_decode($response, true);
+            if (empty($boat) || !is_array($boat)) {
+                return ['inserted' => 0, 'error' => 'Empty or invalid API response'];
+            }
+
+            $products = $boat['products'] ?? [];
+
+            $filtered_products = [];
+
+            if (is_array($products)) {
+                foreach ($products as $product) {
+                    $filtered_products[] = [
+                        'name'              => $product['name'] ?? '',
+                    ];
+                }
+            }
+
+            // Duplicate check
+            $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE id = %d", $yacht_id));
+            if ($exists) return ['inserted' => 0, 'error' => null];
+
+            $filtered = [
+                'id'                => $yacht_id,
+                'name'              => $boat['name'] ?? '',
+                'model'             => $boat['model'] ?? '',
+                'modelId'           => $boat['modelId'] ?? null,
+
+                // Company & location
+                'companyId'         => $boat['companyId'] ?? null,
+                'company'           => $boat['company'] ?? '',
+                'homeBaseId'        => $boat['homeBaseId'] ?? null,
+                'homeBase'          => $boat['homeBase'] ?? '',
+
+                // Yacht details
+                'year'              => $boat['year'] ?? null,
+                'yearNote'          => $boat['yearNote'] ?? '',
+                'kind'              => $boat['kind'] ?? '',
+                'length'            => $boat['length'] ?? null,
+                'beam'              => $boat['beam'] ?? null,
+                'draught'           => $boat['draught'] ?? null,
+
+                // Capacities
+                'cabins'            => $boat['cabins'] ?? null,
+                'berths'            => $boat['berths'] ?? null,
+                'wc'                => $boat['wc'] ?? null,
+                'maxPeopleOnBoard'  => $boat['maxPeopleOnBoard'] ?? $boat['berths'] ?? 0,
+
+                // Technical
+                'engine'            => $boat['engine'] ?? '',
+                'fuelCapacity'      => $boat['fuelCapacity'] ?? null,
+                'waterCapacity'     => $boat['waterCapacity'] ?? null,
+
+                // Money
+                'currency'          => $boat['currency'] ?? 'EUR',
+                'deposit'           => $boat['deposit'] ?? 0,
+                'depositWithWaiver' => $boat['depositWithWaiver'] ?? 0,
+                'commissionPercentage' => $boat['commissionPercentage'] ?? 0,
+                'maxDiscountFromCommissionPercentage'
+                => $boat['maxDiscountFromCommissionPercentage'] ?? 0,
+
+                // Charter rules
+                'defaultCheckInTime'  => $boat['defaultCheckInTime'] ?? '',
+                'defaultCheckOutTime' => $boat['defaultCheckOutTime'] ?? '',
+                'defaultCheckInDay'   => $boat['defaultCheckInDay'] ?? null,
+                'allCheckInDays'      => $boat['allCheckInDays'] ?? [],
+                'minimumCharterDuration' => $boat['minimumCharterDuration'] ?? 0,
+                'maximumCharterDuration' => $boat['maximumCharterDuration'] ?? 0,
+
+                // Media
+                'images'            => $boat['images'] ?? [],
+
+                //Products
+                'products'            => $filtered_products ?? [],
+            ];
+
+            $wpdb->insert($table, [
+                'id'   => $yacht_id,
+                'data' => wp_json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            ]);
+
+            return ['inserted' => 1, 'error' => null];
+
+        } catch (\Throwable $e) {
+            return ['inserted' => 0, 'error' => $e->getMessage()];
+        }
     }
 }
