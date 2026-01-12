@@ -55,10 +55,10 @@ require_once plugin_dir_path(__FILE__) . 'boat-listing/filter-desired-boat-short
 add_filter('cron_schedules', function ($schedules) {
 
     // existing
-    if (!isset($schedules['every_minute'])) {
-        $schedules['every_minute'] = [
-            'interval' => 60,
-            'display'  => 'Every Minute',
+    if (!isset($schedules['every_5_minutes'])) {
+        $schedules['every_5_minutes'] = [
+            'interval' => 300,  // 5 minutes in seconds
+            'display'  => 'Every 5 Minutes',
         ];
     }
 
@@ -75,11 +75,11 @@ register_activation_hook(__FILE__, function () {
     Boat_Listing_Activator::activate();
 
     if (!wp_next_scheduled('bl_daily_availability_sync')) {
-        wp_schedule_event(time(), 'every_minute', 'bl_daily_availability_sync');
+        wp_schedule_event(time(), 'hourly', 'bl_daily_availability_sync');
     }
 
     if (!wp_next_scheduled('bl_boat_sync_cron')) {
-        wp_schedule_event(time(), 'every_minute', 'bl_boat_sync_cron');
+        wp_schedule_event(time(), 'every_5_minutes', 'bl_boat_sync_cron');
     }
 });
 
