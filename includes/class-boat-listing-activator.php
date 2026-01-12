@@ -47,7 +47,6 @@ class Boat_Listing_Activator {
 		$boat_table = $wpdb->prefix . 'boats';
 		$company_table = $wpdb->prefix . 'boat_companies';
 		$boat_category = $wpdb->prefix . 'boat_category';
-		$location_table = $wpdb->prefix . 'boat_locations';
 		$charterbase_table = $wpdb->prefix . 'boat_charterbaese';
 		$book_reserve_table = $wpdb->prefix . 'boat_book_request';
         $boat_country_table = $wpdb->prefix . 'boat_country';
@@ -179,47 +178,6 @@ class Boat_Listing_Activator {
         return $datas ?? [];
     }
 
-    /**
-     * Insert Country State
-     */
-    public static function insert_country_state() {
-
-		global $wpdb;
-        $table_name = $wpdb->prefix . 'boat_country_state';
-
-        $url = 'https://ws.nausys.com/CBMS-external/rest/catalogue/v6/countrystates';
-
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "accept: application/json",
-            "Authorization: Bearer " . self::cread(),
-        ]);
-
-        $response = curl_exec($ch);
-        curl_close($ch);
-
-        $datas = json_decode($response, true);
-
-		if (empty($datas)) {
-            error_log('Booking Manager API returned empty company data.');
-            return false;
-        }
-
-		// Insert into database
-        foreach ($datas['countries'] as $data) {
-            $id = $data['id'];
-            $json_data = wp_json_encode($data);
-
-            $wpdb->replace($table_name, [
-                'id' => $id,
-                'country_state_data' => $json_data,
-            ]);
-        }
-
-        return $datas['countries'] ?? [];
-    }
-
 
     public static function insert_regions() {
 
@@ -299,89 +257,6 @@ class Boat_Listing_Activator {
         }
 
         return $datas ?? [];
-    }
-
-    /**
-     * Insert Free yacht
-     */
-    public static function insert_freeyacht() {
-
-        global $wpdb;
-
-        $table_name = $wpdb->prefix . 'boat_free';
-        $free_yacht_url = "https://ws.nausys.com/CBMS-external/rest/yachtReservation/v6/freeYachts";
-
-        $helper = new Boat_Listing_Helper();
-        $all_yacht_ids = $helper->fetch_boat_ids(); // ✅ fetch all IDs from helper
-
-
-        if (empty($all_yacht_ids)) {
-            return "No yacht IDs found.";
-        }
-
-        // -----------------------------------------------------
-        // ⏰ Date Range (Tomorrow → Next 7 Days)
-        // -----------------------------------------------------
-        $periodFrom = date('d.m.Y', strtotime('+1 day'));
-        $periodTo   = date('d.m.Y', strtotime('+7 days'));
-
-        // -----------------------------------------------------
-        // ⚙️ Process yachts in chunks
-        // -----------------------------------------------------
-        $chunks = array_chunk($all_yacht_ids, 100);
-        
-        $inserted_count = 0;
-
-        foreach ($chunks as $chunk) {
-
-            $free_payload = [
-                "credentials" => [
-                    "username" => get_option('bl_api_key'),
-                ],
-                "periodFrom" => $periodFrom,
-                "periodTo"   => $periodTo,
-                "yachts"     => array_map('intval', $chunk),
-            ];
-
-            $ch = curl_init($free_yacht_url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "accept: application/json",
-                "Authorization: Bearer " . self::cread(),
-            ]);
-            $response = curl_exec($ch);
-            curl_close($ch);
-
-            $datas = json_decode($response, true);
-
-            if (empty($datas['freeYachts'])) {
-                continue;
-            }
-
-            foreach ($datas['freeYachts'] as $free_yacht) {
-                $yacht_id = $free_yacht['yachtId'] ?? null;
-                if (!$yacht_id) continue;
-
-                $wpdb->replace(
-                    $table_name,
-                    [
-                        'id'        => $yacht_id,
-                        'free_data' => wp_json_encode($free_yacht),
-                        ],
-                        [
-                            '%d',
-                            '%s',
-                        ]
-                    );
-
-                $inserted_count++;
-            }
-
-            // Prevent API overload
-            sleep(1);
-        }
-
-        return $inserted_count;
     }
 
     /**
@@ -541,86 +416,6 @@ class Boat_Listing_Activator {
     }
 
     /**
-     * Insert price lists
-     */
-	public static function insert_price_list(){
-
-		global $wpdb;
-        $table_name = $wpdb->prefix . 'boat_price_list';
-
-		$api_url = 'https://ws.nausys.com/CBMS-external/rest/catalogue/v6/priceLists';
-
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "accept: application/json",
-            "Authorization: Bearer " . self::cread(),
-        ]);
-
-        $response = curl_exec($ch);
-        curl_close($ch);
-
-        $datas = json_decode($response, true);
-
-        if (empty($datas)) {
-            error_log('Booking Manager API returned empty model data.');
-            return false;
-        }
-
-        foreach ($datas['priceLists'] as $data) {
-            $id = $data['id'];
-            $json_data = wp_json_encode($data);
-
-            $wpdb->replace($table_name, [
-                'id' => $id,
-                'price_data' => $json_data,
-            ]);
-        }
-
-        return true;
-	}
-
-    /**
-     * Insert Models
-     */
-	public static function insert_models(){
-
-		global $wpdb;
-        $table_name = $wpdb->prefix . 'boat_models';
-
-		$api_url = 'https://ws.nausys.com/CBMS-external/rest/catalogue/v6/yachtModels';
-
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "accept: application/json",
-            "Authorization: Bearer " . self::cread(),
-        ]);
-
-        $response = curl_exec($ch);
-        curl_close($ch);
-
-        $datas = json_decode($response, true);
-
-        if (empty($datas)) {
-            error_log('Booking Manager API returned empty model data.');
-            return false;
-        }
-
-        foreach ($datas['models'] as $data) {
-            $id = $data['id'];
-            $json_data = wp_json_encode($data);
-
-            $wpdb->replace($table_name, [
-                'id' => $id,
-                'model_data' => $json_data,
-            ]);
-        }
-
-        return true;
-	}
-
-    /**
      * Insert Category
      */
     public static function insert_category() {
@@ -667,47 +462,6 @@ class Boat_Listing_Activator {
 
         return true;
     }
-
-    /**
-     * Insert Location
-     */
-	public static function insert_locaitons(){
-
-		global $wpdb;
-        $table_name = $wpdb->prefix . 'boat_locations';
-
-		$api_url = 'https://ws.nausys.com/CBMS-external/rest/catalogue/v6/locations';
-
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "accept: application/json",
-            "Authorization: Bearer " . self::cread(),
-        ]);
-
-        $response = curl_exec($ch);
-        curl_close($ch);
-
-        $datas = json_decode($response, true);
-
-        if (empty($datas)) {
-            error_log('Booking Manager API returned empty location data.');
-            return false;
-        }
-
-        foreach ($datas['locations'] as $data) {
-            $id = $data['id'];
-            $json_data = wp_json_encode($data);
-
-            $wpdb->replace($table_name, [
-                'id' => $id,
-                'location_data' => $json_data,
-            ]);
-        }
-
-        return true;
-
-	}
 
     public static function insert_charterbases() {
         global $wpdb;
@@ -763,8 +517,6 @@ class Boat_Listing_Activator {
 
         $current_year = date('Y');
 
-        $year = $current_year + $i;
-
         // API URL with only year
         $url = "https://www.booking-manager.com/api/v2/shortAvailability/{$current_year}?format=1";
 
@@ -788,7 +540,7 @@ class Boat_Listing_Activator {
                 "{$wpdb->prefix}yacht_availability",
                 [
                     'yacht_id'            => (int) $row['y'],
-                    'year'                => $year,
+                    'year'                => $current_year,
                     'availability_string' => $row['bs'],
                     'updated_at'          => current_time('mysql'),
                 ]
