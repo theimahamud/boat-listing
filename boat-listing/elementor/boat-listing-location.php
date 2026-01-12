@@ -13,7 +13,7 @@ class boat_listing_location extends \ElementorPro\Modules\Forms\Fields\Field_Bas
         add_action( 'elementor/preview/init', [ $this, 'editor_preview_footer' ] );
 
         $helper = new Boat_Listing_Helper();
-        $this->locations = $helper->fetch_all_locations(); // store for later
+        $this->locations = $helper->fetch_regions(); // store for later
     }
 
     public function get_type() {
