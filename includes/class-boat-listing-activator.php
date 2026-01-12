@@ -95,6 +95,8 @@ class Boat_Listing_Activator {
             yacht_id BIGINT(20) UNSIGNED NOT NULL,
             status VARCHAR(20) DEFAULT 'pending',
             last_error TEXT NULL,
+            retry_count INT DEFAULT 0,
+            next_retry_at DATETIME NULL;
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
             UNIQUE KEY yacht_id (yacht_id),
@@ -115,13 +117,6 @@ class Boat_Listing_Activator {
 		) $charset_collate;";
 
 		dbDelta($category);
-
-		$location = "CREATE TABLE $location_table (
-			id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
-			location_data LONGTEXT NOT NULL
-		) $charset_collate;";
-
-		dbDelta($location);
 
 		$charterbases = "CREATE TABLE $charterbase_table (
 			id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
@@ -379,6 +374,12 @@ class Boat_Listing_Activator {
 
         $rows = json_decode($response, true);
 
+        if (!is_array($rows)) {
+            error_log('❌ Yacht availability API returned empty or invalid data');
+            delete_transient('bl_availability_lock');
+            return;
+        }
+
         foreach ($rows as $row) {
             $wpdb->replace(
                 "{$wpdb->prefix}yacht_availability",
@@ -406,33 +407,106 @@ class Boat_Listing_Activator {
         }
         set_transient('bl_boat_sync_lock', 1, 300); // lock 5 min
 
-        // Fetch all available yacht IDs
-        $yacht_ids = $wpdb->get_col("SELECT yacht_id FROM {$wpdb->prefix}yacht_availability");
+        $queue_table = $wpdb->prefix . 'boat_sync_queue';
+        $batch_size  = 50; // ✅ per cron how many yachts
+
+        // Fetch pending yacht IDs (BATCH)
+        $yacht_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT yacht_id 
+             FROM {$queue_table}
+             WHERE status = %s
+             LIMIT %d",
+                'pending',
+                $batch_size
+            )
+        );
 
         if (empty($yacht_ids)) {
-            wp_clear_scheduled_hook('bl_boat_sync_cron');
             delete_transient('bl_boat_sync_lock');
-            error_log('🎉 No yachts available. Cron stopped.');
+            error_log('🎉 No pending yachts left to sync.');
             return;
         }
 
-        // Process each yacht ID
-        foreach ($yacht_ids as $yacht_id) {
-            $result = self::insert_boat_by_yacht_id($yacht_id); // call same insert_boats method
+        $queue_table = $wpdb->prefix . 'boat_sync_queue';
 
-            // Log result in the same way
+        foreach ($yacht_ids as $yacht_id) {
+            $result = self::insert_boat_by_yacht_id($yacht_id);
+
             if ($result['error']) {
                 error_log("❌ Yacht {$yacht_id} sync failed: {$result['error']}");
+
+                // Retry system
+                $retry_count = (int) $wpdb->get_var(
+                    $wpdb->prepare(
+                        "SELECT retry_count FROM {$queue_table} WHERE yacht_id = %d",
+                        $yacht_id
+                    )
+                );
+
+                $delay = self::get_retry_delay($retry_count);
+
+                if ($delay === null) {
+                    // Permanent failure
+                    $wpdb->update(
+                        $queue_table,
+                        [
+                            'status'     => 'failed',
+                            'last_error' => $result['error'],
+                        ],
+                        ['yacht_id' => $yacht_id]
+                    );
+                } else {
+                    // Retry later
+                    $wpdb->update(
+                        $queue_table,
+                        [
+                            'status'        => 'failed',
+                            'retry_count'   => $retry_count + 1,
+                            'next_retry_at' => date('Y-m-d H:i:s', time() + $delay),
+                            'last_error'    => $result['error'],
+                        ],
+                        ['yacht_id' => $yacht_id]
+                    );
+                }
+
             } else {
                 error_log("✅ Yacht {$yacht_id} synced successfully ({$result['inserted']} inserted).");
+                sleep(1);
+                // Success → remove from queue or mark done
+                $wpdb->update(
+                    $queue_table,
+                    ['status' => 'done', 'last_error' => ''],
+                    ['yacht_id' => $yacht_id]
+                );
             }
         }
 
         delete_transient('bl_boat_sync_lock');
     }
 
+    public static function get_retry_delay($retry_count) {
+        // Exponential backoff: 1st retry → 1 min, 2nd → 5 min, 3rd → 15 min, 4th → 1 hour
+        $delays = [
+            0 => 60,       // 1 minute
+            1 => 300,      // 5 minutes
+            2 => 900,      // 15 minutes
+            3 => 3600,     // 1 hour
+            4 => 7200,     // 2 hours
+            5 => 14400,    // 4 hours
+        ];
+
+        // Max retries exceeded → return null (permanent failure)
+        if (!isset($delays[$retry_count])) {
+            return null;
+        }
+
+        return $delays[$retry_count];
+    }
+
     public static function insert_boat_by_yacht_id($yacht_id) {
         global $wpdb;
+
         $table = $wpdb->prefix . 'boats';
         $url   = "https://www.booking-manager.com/api/v2/yacht/{$yacht_id}";
 
@@ -460,51 +534,45 @@ class Boat_Listing_Activator {
             }
 
             $products = $boat['products'] ?? [];
-
             $filtered_products = [];
 
             if (is_array($products)) {
                 foreach ($products as $product) {
                     $filtered_products[] = [
-                        'name'              => $product['name'] ?? '',
+                        'name' => $product['name'] ?? '',
                     ];
                 }
             }
 
-            // Duplicate check
-            $exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE id = %d", $yacht_id));
-            if ($exists) return ['inserted' => 0, 'error' => null];
-
             $filtered = [
-                'id'                => $yacht_id,
-                'name'              => $boat['name'] ?? '',
-                'model'             => $boat['model'] ?? '',
-                'modelId'           => $boat['modelId'] ?? null,
+                'id'        => $yacht_id,
+                'name'      => $boat['name'] ?? '',
+                'model'     => $boat['model'] ?? '',
+                'modelId'   => $boat['modelId'] ?? null,
 
                 // Company & location
-                'companyId'         => $boat['companyId'] ?? null,
-                'company'           => $boat['company'] ?? '',
-                'homeBaseId'        => $boat['homeBaseId'] ?? null,
-                'homeBase'          => $boat['homeBase'] ?? '',
+                'companyId'  => $boat['companyId'] ?? null,
+                'company'    => $boat['company'] ?? '',
+                'homeBaseId' => $boat['homeBaseId'] ?? null,
+                'homeBase'   => $boat['homeBase'] ?? '',
 
                 // Yacht details
-                'year'              => $boat['year'] ?? null,
-                'yearNote'          => $boat['yearNote'] ?? '',
-                'kind'              => $boat['kind'] ?? '',
-                'length'            => $boat['length'] ?? null,
-                'beam'              => $boat['beam'] ?? null,
-                'draught'           => $boat['draught'] ?? null,
+                'year'    => $boat['year'] ?? null,
+                'kind'    => $boat['kind'] ?? '',
+                'length'  => $boat['length'] ?? null,
+                'beam'    => $boat['beam'] ?? null,
+                'draught' => $boat['draught'] ?? null,
 
                 // Capacities
-                'cabins'            => $boat['cabins'] ?? null,
-                'berths'            => $boat['berths'] ?? null,
-                'wc'                => $boat['wc'] ?? null,
-                'maxPeopleOnBoard'  => $boat['maxPeopleOnBoard'] ?? $boat['berths'] ?? 0,
+                'cabins'           => $boat['cabins'] ?? null,
+                'berths'           => $boat['berths'] ?? null,
+                'wc'               => $boat['wc'] ?? null,
+                'maxPeopleOnBoard' => $boat['maxPeopleOnBoard'] ?? $boat['berths'] ?? 0,
 
                 // Technical
-                'engine'            => $boat['engine'] ?? '',
-                'fuelCapacity'      => $boat['fuelCapacity'] ?? null,
-                'waterCapacity'     => $boat['waterCapacity'] ?? null,
+                'engine'        => $boat['engine'] ?? '',
+                'fuelCapacity'  => $boat['fuelCapacity'] ?? null,
+                'waterCapacity' => $boat['waterCapacity'] ?? null,
 
                 // Money
                 'currency'          => $boat['currency'] ?? 'EUR',
@@ -515,23 +583,25 @@ class Boat_Listing_Activator {
                 => $boat['maxDiscountFromCommissionPercentage'] ?? 0,
 
                 // Charter rules
-                'defaultCheckInTime'  => $boat['defaultCheckInTime'] ?? '',
-                'defaultCheckOutTime' => $boat['defaultCheckOutTime'] ?? '',
-                'defaultCheckInDay'   => $boat['defaultCheckInDay'] ?? null,
-                'allCheckInDays'      => $boat['allCheckInDays'] ?? [],
-                'minimumCharterDuration' => $boat['minimumCharterDuration'] ?? 0,
-                'maximumCharterDuration' => $boat['maximumCharterDuration'] ?? 0,
+                'defaultCheckInTime'        => $boat['defaultCheckInTime'] ?? '',
+                'defaultCheckOutTime'       => $boat['defaultCheckOutTime'] ?? '',
+                'defaultCheckInDay'         => $boat['defaultCheckInDay'] ?? null,
+                'allCheckInDays'            => $boat['allCheckInDays'] ?? [],
+                'minimumCharterDuration'    => $boat['minimumCharterDuration'] ?? 0,
+                'maximumCharterDuration'    => $boat['maximumCharterDuration'] ?? 0,
 
-                // Media
-                'images'            => $boat['images'] ?? [],
-
-                //Products
-                'products'            => $filtered_products ?? [],
+                // Media & products
+                'images'   => $boat['images'] ?? [],
+                'products' => $filtered_products,
             ];
 
-            $wpdb->insert($table, [
+            // ✅ REPLACE = insert or update (no duplicate SELECT)
+            $wpdb->replace($table, [
                 'id'   => $yacht_id,
-                'data' => wp_json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                'data' => wp_json_encode(
+                    $filtered,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                ),
             ]);
 
             return ['inserted' => 1, 'error' => null];

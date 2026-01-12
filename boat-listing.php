@@ -75,12 +75,11 @@ register_activation_hook(__FILE__, function () {
     Boat_Listing_Activator::activate();
 
     if (!wp_next_scheduled('bl_daily_availability_sync')) {
-        wp_schedule_event(time(), 'hourly', 'bl_daily_availability_sync');
+        wp_schedule_event(time(), 'every_minute', 'bl_daily_availability_sync');
     }
 
-    // Schedule cron safely
     if (!wp_next_scheduled('bl_boat_sync_cron')) {
-        wp_schedule_event(time(), 'hourly', 'bl_boat_sync_cron');
+        wp_schedule_event(time(), 'every_minute', 'bl_boat_sync_cron');
     }
 });
 
