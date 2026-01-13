@@ -76,21 +76,20 @@ class Boat_Listing_Activator {
 
 		dbDelta($boat_regions);
 
-        $sql = "CREATE TABLE $yacht_availability_table (
+        $yacht_availability_table = "CREATE TABLE $yacht_availability_table (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             yacht_id BIGINT(20) UNSIGNED NOT NULL,
             year SMALLINT(4) NOT NULL,
             availability_string LONGTEXT NOT NULL,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        
             PRIMARY KEY (id),
             UNIQUE KEY yacht_year (yacht_id, year),
             KEY idx_yacht (yacht_id),
             KEY idx_year (year)
         ) $charset_collate;";
-        dbDelta($sql);
+        dbDelta($yacht_availability_table);
 
-        $sql = "CREATE TABLE $boat_sync_queue_table (
+        $boat_sync_queue_table = "CREATE TABLE $boat_sync_queue_table (
             id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
             yacht_id BIGINT(20) UNSIGNED NOT NULL,
             status VARCHAR(20) DEFAULT 'pending',
@@ -102,7 +101,7 @@ class Boat_Listing_Activator {
             UNIQUE KEY yacht_id (yacht_id),
             KEY status (status)
         ) $charset_collate;";
-        dbDelta($sql);
+        dbDelta($boat_sync_queue_table);
 
         $company = "CREATE TABLE $company_table (
             id BIGINT(20) UNSIGNED NOT NULL PRIMARY KEY,
